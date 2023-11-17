@@ -1,6 +1,6 @@
 ; Filename: networks/LongTermImprovement.inp
 ; WNTR: 1.0.0
-; Created: 2023-11-14 19:44:36
+; Created: 2023-11-17 23:20:18
 [TITLE]
 
 [JUNCTIONS]
@@ -1584,7 +1584,7 @@ PUMP PU9        PRICE   1.0000
 
 [SOURCES]
 ;Node      Type       Quality    Pattern   
-J511       SETPOINT   2000000.0  SourcePattern
+J175       SETPOINT   2000000.0  SourcePattern
 
 [REACTIONS]
 ;Type           Pipe/Tank               Coefficient
