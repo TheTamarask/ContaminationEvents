@@ -1,4 +1,4 @@
-  Page 1                                    Tue Nov 28 19:49:59 2023
+  Page 1                                    Tue Nov 28 22:00:34 2023
 
   ******************************************************************
   *                           E P A N E T                          *
@@ -7,6 +7,16 @@
   *                         Version 2.2                            *
   ******************************************************************
   
-  Analysis begun Tue Nov 28 19:49:59 2023
+  Analysis begun Tue Nov 28 22:00:34 2023
 
-  Analysis ended Tue Nov 28 19:49:59 2023
+  Water Quality Mass Balance (mg)
+  ================================
+  Initial Mass:      0.00000e+000
+  Mass Inflow:       2.59148e+008
+  Mass Outflow:      2.51709e+008
+  Mass Reacted:      0.00000e+000
+  Final Mass:        7.43878e+006
+  Mass Ratio:         1.00000
+  ================================
+
+  Analysis ended Tue Nov 28 22:00:34 2023

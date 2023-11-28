@@ -111,7 +111,7 @@ def brute_force_chemical_pollution(water_network_dict):
 
 
 # Create a water network model and dictionary
-inp_file = 'networks/LongTermImprovement.inp'
+inp_file = 'networks/Net3.inp'
 wn = wntr.network.WaterNetworkModel(inp_file)
 wn_dict = wntr.network.to_dict(wn)
 
@@ -123,17 +123,25 @@ wn_dict = wntr.network.to_dict(wn)
 # Add changes from dictionary to Water Network
 wn = wntr.network.from_dict(wn_dict)
 
+scenario_names = wn.junction_name_list
+sim = wntr.sim.EpanetSimulator(wn)
+sim.run_sim(save_hyd=True)
+wn.options.quality.parameter = 'TRACE'
+inj_node = '10'
+print(inj_node)
+wn.options.quality.trace_node = inj_node
+sim_results = sim.run_sim(use_hyd=True)
+trace = sim_results.node['quality']
+
+row = trace.loc[52200]
+print(row)
+#ax1 = wntr.graphics.plot_interactive_network(wn, node_attribute=trace['52200'], node_size=10, title='Pollution in the system')
+
+
+
 # Graph the network witout any additions
 wntr.graphics.plot_interactive_network(wn, title="Water network system diagram")
 
+
 #analyze_chemical_pollution(NUMBER_OF_ITERATIONS)
 #brute_force_chemical_pollution(wn_dict)
-# Set node used for tracing - not used in quality simluation for pollution
-#   wn.options.quality.trace_node = '111'
-
-
-
-
-
-
-
