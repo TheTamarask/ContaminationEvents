@@ -1,9 +1,7 @@
 import copy
 
 import numpy as np
-from random import random
 import wntr
-import wntr.network.controls as controls
 import pandas as pd
 
 # Constants
@@ -55,7 +53,7 @@ def analyze_chemical_pollution(iterations, water_network):
         results = sim.run_sim()
 
         # Plot results on the network
-        simulation_data = results.node['quality'].loc[5 * 3600, :]
+        simulation_data = results.node['quality'].loc[HOURS_OF_SIMULATION * HOUR, :]
         ax1 = wntr.graphics.plot_interactive_network(water_network, node_attribute=simulation_data, node_size=10,
                                                      title='Pollution in the system')
 
@@ -96,7 +94,7 @@ def brute_force_chemical_pollution(water_network):
         results = sim.run_sim()
 
         # Plot results on the network
-        simulation_data = results.node['quality'].loc[5 * 3600, :]
+        simulation_data = results.node['quality'].loc[HOURS_OF_SIMULATION * HOUR, :]
         # ax1 = wntr.graphics.plot_interactive_network(wn, node_attribute=simulation_data, node_size=10, title='Pollution in the system')
 
         # Extract the number of junctions that are polluted above the threshold
@@ -136,14 +134,6 @@ def pollution_analysis(water_network):
     water_network_for_trace.options.time.pattern_timestep = HOUR
     water_network_for_trace.options.time.hydraulic_timestep = 15 * MINUTE
     water_network_for_trace.options.time.quality_timestep = 15 * MINUTE
-    # prepare master hyd file
-    sim.run_sim(save_hyd=True, file_prefix='master')
-
-    # water_network.options.quality.parameter = 'TRACE'
-
-    # inj_node = polluted_node['name']
-    # print(inj_node)
-    # water_network.options.quality.trace_node = inj_node
 
     # Prepare results DF
     dataframe_structure = {
@@ -181,37 +171,33 @@ def pollution_analysis(water_network):
                     traced_node = node
                     break
             print("Symulacja kolejnego node: " + traced_node['name'])
-            simulate_trace(water_network_for_trace, traced_node)
+            simulate_trace(water_network_for_trace, traced_node, step)
 
     print('fin')
 
 
-def simulate_trace(water_network, trace_node):
-    water_network.options.quality.parameter = 'TRACE'
-    print('Symulacja rozpływu node: ', trace_node['name'])
-    water_network.options.quality.trace_node = trace_node
-    sim = wntr.sim.EpanetSimulator(water_network)
+def simulate_trace(water_network, trace_node, step):
+    inj_node = trace_node['name']
 
-
-def old_pollution_analysis(water_network):
-    scenario_names = water_network.junction_name_list
-    sim = wntr.sim.EpanetSimulator(water_network)
-    sim.run_sim(save_hyd=True, file_prefix='master')
     water_network.options.quality.parameter = 'TRACE'
-    inj_node = '10'
-    print(inj_node)
     water_network.options.quality.trace_node = inj_node
-    sim_results = sim.run_sim(use_hyd=True)
-    trace = sim_results.node['quality']
-    row = trace.loc[52200]
-    print(row)
+    water_network.options.time.duration = step * (15 * MINUTE)
+    # Simulate hydraulics
+    sim = wntr.sim.EpanetSimulator(water_network)
+    results = sim.run_sim()
 
-    # Graph the network witout any additions
-    wntr.graphics.plot_interactive_network(water_network, title="Water network system diagram")
-    # ax1 = wntr.graphics.plot_interactive_network(wn, node_attribute=trace['52200'], node_size=10, title='Pollution in the system')
+    flowrates = results.node['quality'].loc[step * (15 * MINUTE), :]
+    # Prepare results
+    results_dictionary = {
+        'Node': [trace_node['name']],
+        'Step': [step],
+        'Flowrates': [flowrates]
+    }
+    return results_dictionary
 
 
 # analyze_chemical_pollution(NUMBER_OF_ITERATIONS, wn)
 # brute_force_chemical_pollution(wn)
 pollution_analysis(wn)
-# ax1 = wntr.graphics.plot_interactive_network(wn, node_attribute=trace['52200'], node_size=10, title='Pollution in the system')
+# ax1 = wntr.graphics.plot_interactive_network(wn, node_attribute=trace['52200'], node_size=10,
+# title='Pollution in the system')
