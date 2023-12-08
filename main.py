@@ -158,7 +158,6 @@ def pollution_analysis(water_network):
     sim_steps = int(HOURS_OF_SIMULATION * HOUR / (15 * MINUTE))  # hours
 
     for step in range(0, sim_steps + 1, 1):
-        print(step)
         wn.options.time.duration = step * (15 * MINUTE)
         simulation_results = sim.run_sim()
         pollution_data = simulation_results.node['quality'].loc[step * (15 * MINUTE), :]
@@ -166,24 +165,31 @@ def pollution_analysis(water_network):
         # Get list of polluted nodes
         # Extract the number of junctions that are polluted above the threshold
         list_polluted_nodes = pollution_data.ge(POLLUTION_THRESHOLD)
-        list_polluted_nodes = list_polluted_nodes[list_polluted_nodes==True]
-        number_of_polluted_nodes = sum(list_polluted_nodes)
+        list_polluted_nodes = list_polluted_nodes.to_frame().reset_index()
+        list_polluted_nodes = list_polluted_nodes.rename(columns={step * (15 * MINUTE): 'pollution'})
+        list_polluted_nodes = list_polluted_nodes[list_polluted_nodes.pollution]
+        number_of_polluted_nodes = sum(list_polluted_nodes.pollution)
         temp_dict = {"Time [s]": step * (15 * MINUTE), "Node": polluted_node['name'],
                      "Number_of_polluted_nodes": number_of_polluted_nodes}
         polluted_nodes_results.loc[len(polluted_nodes_results)] = temp_dict
 
         # start trace simulation for each of polluted nodes
-        for node in list_polluted_nodes:
-            print("Symulacja kolejnego node")
-            simulate_trace(water_network_for_trace, node)
+        for node_name in list_polluted_nodes['name']:
+            traced_node = None
+            for node in wn_dict['nodes']:
+                if node['name'] == node_name:
+                    traced_node = node
+                    break
+            print("Symulacja kolejnego node: " + traced_node['name'])
+            simulate_trace(water_network_for_trace, traced_node)
 
     print('fin')
 
 
-def simulate_trace(water_network, node):
+def simulate_trace(water_network, trace_node):
     water_network.options.quality.parameter = 'TRACE'
-    print('Symulacja rozpływu node: ', node)
-    water_network.options.quality.trace_node = node
+    print('Symulacja rozpływu node: ', trace_node['name'])
+    water_network.options.quality.trace_node = trace_node
     sim = wntr.sim.EpanetSimulator(water_network)
 
 
