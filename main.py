@@ -118,7 +118,8 @@ def pollution_analysis(water_network):
     # Poison select node in CHEMICAL sim network
     # TEMP: select random node
     polluted_node_index = np.random.randint(0, len(wn_dict['nodes']))
-    polluted_node = wn_dict['nodes'][polluted_node_index]
+    # polluted_node = wn_dict['nodes'][polluted_node_index]
+    polluted_node = wn_dict['nodes'][21]  # TEMP zatrucie node 123
     print(polluted_node['name'])
     water_network.add_source('PollutionSource', polluted_node['name'], 'SETPOINT', 2000, 'PollutionPattern')
     water_network.options.quality.parameter = 'CHEMICAL'
@@ -135,13 +136,21 @@ def pollution_analysis(water_network):
     water_network_for_trace.options.time.hydraulic_timestep = 15 * MINUTE
     water_network_for_trace.options.time.quality_timestep = 15 * MINUTE
 
-    # Prepare results DF
-    dataframe_structure = {
+    # Prepare results dict
+    results_list = list()
+
+    step_results_dict = {
+        'Step': [],
         'Time [s]': [],
         'Node': [],
-        'Number_of_polluted_nodes': []
+        'Number_of_polluted_nodes': [],
+        'Node status[true/false]': [],
+        'Flowrates_per_polluted_node_per_step': []
     }
-    polluted_nodes_results = pd.DataFrame(dataframe_structure)
+    flowrates_per_polluted_node_per_step_dict = {
+        'Traced_node': [],
+        'Flowrates': []
+    }
 
     # Then run simulation step by step
 
@@ -154,26 +163,43 @@ def pollution_analysis(water_network):
 
         # Get list of polluted nodes
         # Extract the number of junctions that are polluted above the threshold
-        list_polluted_nodes = pollution_data.ge(POLLUTION_THRESHOLD)
-        list_polluted_nodes = list_polluted_nodes.to_frame().reset_index()
-        list_polluted_nodes = list_polluted_nodes.rename(columns={step * (15 * MINUTE): 'pollution'})
-        list_polluted_nodes = list_polluted_nodes[list_polluted_nodes.pollution]
-        number_of_polluted_nodes = sum(list_polluted_nodes.pollution)
-        temp_dict = {"Time [s]": step * (15 * MINUTE), "Node": polluted_node['name'],
-                     "Number_of_polluted_nodes": number_of_polluted_nodes}
-        polluted_nodes_results.loc[len(polluted_nodes_results)] = temp_dict
+        series_polluted_nodes = pollution_data.ge(POLLUTION_THRESHOLD)
+        series_polluted_nodes_trimmed = series_polluted_nodes[series_polluted_nodes]
+        df_polluted_nodes = series_polluted_nodes_trimmed.to_frame().reset_index()
+        df_polluted_nodes = df_polluted_nodes.rename(columns={step * (15 * MINUTE): 'pollution'})
+        number_of_polluted_nodes = sum(series_polluted_nodes_trimmed)
 
         # start trace simulation for each of polluted nodes
-        for node_name in list_polluted_nodes['name']:
-            traced_node = None
-            for node in wn_dict['nodes']:
-                if node['name'] == node_name:
-                    traced_node = node
-                    break
-            print("Symulacja kolejnego node: " + traced_node['name'])
-            simulate_trace(water_network_for_trace, traced_node, step)
-
-    print('fin')
+        list_flowrates = list()
+        if number_of_polluted_nodes == 0:
+            list_flowrates.append(None)
+        else:
+            for node_name in df_polluted_nodes['name']:
+                traced_node = None
+                for node in wn_dict['nodes']:
+                    if node['name'] == node_name:
+                        traced_node = node
+                        break
+                print("Symulacja kolejnego node: " + traced_node['name'])
+                trace_results = simulate_trace(water_network_for_trace, traced_node, step)
+                temp=trace_results['Flowrates'][0]
+                temp=temp.T
+                temp=temp.loc[step * (15 * MINUTE), :]
+                ax = wntr.graphics.plot_interactive_network(wn, node_attribute=temp, node_size=10)
+                trace_sum = trace_results['Flowrates'][0].to_numpy().sum()
+                list_flowrates.append(trace_results)
+        print("Przygotowanie wyników")
+        temp_dict = {
+            'Step': step,
+            'Time [s]': step * (15 * MINUTE),
+            'Node': polluted_node['name'],
+            'Number_of_polluted_nodes': number_of_polluted_nodes,
+            'Node status[true/false]': df_polluted_nodes,
+            'Flowrates_per_polluted_node_per_step': list_flowrates
+        }
+        results_list.append(temp_dict)
+        print('fin_step' + str(step))
+    print('fin_final')
 
 
 def simulate_trace(water_network, trace_node, step):
@@ -187,10 +213,10 @@ def simulate_trace(water_network, trace_node, step):
     results = sim.run_sim()
 
     flowrates = results.node['quality'].loc[step * (15 * MINUTE), :]
+    flowrates = flowrates.to_frame()
     # Prepare results
     results_dictionary = {
         'Node': [trace_node['name']],
-        'Step': [step],
         'Flowrates': [flowrates]
     }
     return results_dictionary

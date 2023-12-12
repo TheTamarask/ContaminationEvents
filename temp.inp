@@ -1,6 +1,6 @@
 ; Filename: networks/Net3.inp
 ; WNTR: 1.0.0
-; Created: 2023-12-08 14:55:49
+; Created: 2023-12-12 19:21:23
 [TITLE]
 EPANET Example Network 3, updated to include longer duration
 Example showing how the percent of Lake water in a dual-source
@@ -399,7 +399,7 @@ UNBALANCED           CONTINUE 10
 PATTERN              1                   
 DEMAND MULTIPLIER    1
 EMITTER EXPONENT     0.5
-QUALITY              TRACE 60
+QUALITY              TRACE 119
 DIFFUSIVITY          1
 TOLERANCE            0.01
 
