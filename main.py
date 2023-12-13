@@ -213,6 +213,7 @@ def simulate_trace(water_network, trace_node, step):
     results = sim.run_sim()
 
     flowrates = results.node['quality'].loc[step * (15 * MINUTE), :]
+    flowrates_sum= flowrates.sum()
     flowrates = flowrates.to_frame()
     # Prepare results
     results_dictionary = {
