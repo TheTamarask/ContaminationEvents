@@ -1,6 +1,6 @@
 ; Filename: networks/Net3.inp
 ; WNTR: 1.0.0
-; Created: 2023-12-13 17:54:40
+; Created: 2023-12-27 19:59:13
 [TITLE]
 EPANET Example Network 3, updated to include longer duration
 Example showing how the percent of Lake water in a dual-source
@@ -354,6 +354,7 @@ DEMAND CHARGE          0.0000
 
 [SOURCES]
 ;Node      Type       Quality    Pattern   
+15         SETPOINT   2000000.0  PollutionPattern
 
 [REACTIONS]
 ;Type           Pipe/Tank               Coefficient
@@ -370,7 +371,7 @@ DEMAND CHARGE          0.0000
 ;Tank ID             Model Fraction
 
 [TIMES]
-DURATION             00:15:00
+DURATION             24:00:00
 HYDRAULIC TIMESTEP   00:15:00
 QUALITY TIMESTEP     00:15:00
 PATTERN TIMESTEP     01:00:00
@@ -399,7 +400,7 @@ UNBALANCED           CONTINUE 10
 PATTERN              1                   
 DEMAND MULTIPLIER    1
 EMITTER EXPONENT     0.5
-QUALITY              TRACE 119
+QUALITY              Chemical mg/L
 DIFFUSIVITY          1
 TOLERANCE            0.01
 
