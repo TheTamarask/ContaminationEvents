@@ -14,7 +14,7 @@ NUMBER_OF_ITERATIONS = 5
 POLLUTION_THRESHOLD = 300
 
 # Create a water network model and dictionary
-inp_file = 'networks/Net3.inp'
+inp_file = 'networks/Net2.inp'
 wn = wntr.network.WaterNetworkModel(inp_file)
 
 # Define pollution pattern
@@ -69,43 +69,35 @@ def analyze_chemical_pollution(iterations, water_network):
 
 def brute_force_chemical_pollution_one_source(water_network):
     water_network_dict = wntr.network.to_dict(water_network)
-    water_network.options.quality.parameter = 'CHEMICAL'
-
-    # Get number of iterations
-    iterations = len(water_network_dict['nodes'])
-    i = 0
 
     dataframe_structure = {
         'iteration': [],
         'Node': [],
-        'Number_of_polluted_nodes': []
+        'Simulation end polluted nodes [%]': [],
+        'Max polluted nodes [%]': []
     }
     pollution_results = pd.DataFrame(dataframe_structure)
     # Running simulations of pollution for all the nodes
-    while i < iterations:
-        # Add source of chemical pollution to joint from the dictionary
-        polluted_node = water_network_dict['nodes'][i]
-        print(polluted_node['name'])
-        # Create a new source of pollution
-        water_network.add_source('PollutionSource', polluted_node['name'], 'SETPOINT', 2000, 'PollutionPattern')
+    for i in range(len(water_network_dict['nodes'])):
+        t_node_to_pollute = [water_network_dict['nodes'][i]['name']]
+        analysis_results = pollution_analysis(water_network, t_node_to_pollute)
+        dataframe_structure['iteration'] = i
+        dataframe_structure['Node'] = t_node_to_pollute[0]
+        dataframe_structure['Simulation end polluted nodes [%]'] = analysis_results['Simulation end polluted nodes [%]']
+        dataframe_structure['Max polluted nodes [%]'] = analysis_results['Max polluted nodes [%]']
 
-        # Simulate hydraulics
-        sim = wntr.sim.EpanetSimulator(water_network)
-        results = sim.run_sim()
+        pollution_results.loc[len(pollution_results)] = dataframe_structure
 
-        # Plot results on the network
-        simulation_data = results.node['quality'].loc[HOURS_OF_SIMULATION * HOUR, :]
-        # ax1 = wntr.graphics.plot_interactive_network(wn, node_attribute=simulation_data, node_size=10, title='Pollution in the system')
-
-        # Extract the number of junctions that are polluted above the threshold
-        polluted_nodes = simulation_data.ge(POLLUTION_THRESHOLD)
-        number_of_polluted_nodes = sum(polluted_nodes)
-        temp_dict = {"iteration": i, "Node": polluted_node['name'],
-                     "Number_of_polluted_nodes": number_of_polluted_nodes}
-        pollution_results.loc[len(pollution_results)] = temp_dict
-        i += 1
-    pollution_results = pollution_results.sort_values(by=['Number_of_polluted_nodes'], ascending=False)
-    print(pollution_results)
+    pollution_results_alltime = copy.deepcopy(pollution_results)
+    pollution_results_alltime = pollution_results_alltime.sort_values(by=['Max polluted nodes [%]'], ascending=False)
+    pollution_results = pollution_results.sort_values(by=['Simulation end polluted nodes [%]'], ascending=False)
+    return_dict = {
+        'Alltime best node': pollution_results_alltime.iloc[0]['Node'],
+        'Alltime best pollution [%]': pollution_results_alltime.iloc[0]['Max polluted nodes [%]'],
+        'Sim end best node': pollution_results.iloc[0]['Node'],
+        'Sim end best pollution': pollution_results_alltime.iloc[0]['Simulation end polluted nodes [%]']
+    }
+    return return_dict
 
 
 def pollution_analysis(water_network, nodes_to_pollute):
@@ -127,29 +119,31 @@ def pollution_analysis(water_network, nodes_to_pollute):
     water_network.options.quality.parameter = 'CHEMICAL'
 
     # Define timesteps of the simulation for CHEMICAL ...
+    water_network.options.time.start_clocktime = 0
     water_network.options.time.duration = HOURS_OF_SIMULATION * HOUR
     water_network.options.time.pattern_timestep = HOUR
     water_network.options.time.hydraulic_timestep = 15 * MINUTE
     water_network.options.time.quality_timestep = 15 * MINUTE
+    water_network.options.time.report_timestep = 15 * MINUTE
     sim = wntr.sim.EpanetSimulator(water_network)
     # and TRACE...
+    water_network_for_trace.options.time.start_clocktime = 0
     water_network_for_trace.options.time.duration = HOURS_OF_SIMULATION * HOUR
     water_network_for_trace.options.time.pattern_timestep = HOUR
     water_network_for_trace.options.time.hydraulic_timestep = 15 * MINUTE
     water_network_for_trace.options.time.quality_timestep = 15 * MINUTE
-
-    # Prepare results dict
-    results_dict = {
-        'Simulation finish polluted nodes': [],
-        'List of polluted nodes at simulation finish': [],
-        'Max polluted nodes': [],
-        'Timestamp max polluted nodes': [],
-        'List of polluted nodes at any time': []
-    }
-
+    water_network_for_trace.options.time.report_timestep = 15 * MINUTE
+    # Prepare results structures
     step_results_list = list()
     df_polluted_nodes_alltime = pd.DataFrame()
-
+    results_dict = {
+        'Simulation end polluted nodes [%]': [],
+        'List of polluted nodes at simulation finish': [],
+        'Max polluted nodes [%]': [],
+        'Timestamp max polluted nodes': [],
+        'List of polluted nodes at max pollution time': [],
+        'List of polluted nodes at any time': []
+    }
     step_results_dict = {
         'Step': [],
         'Time [s]': [],
@@ -164,7 +158,6 @@ def pollution_analysis(water_network, nodes_to_pollute):
     }
 
     # Then run simulation step by step
-
     sim_steps = int(HOURS_OF_SIMULATION * HOUR / (15 * MINUTE))  # hours
 
     for step in range(0, sim_steps + 1, 1):
@@ -225,7 +218,6 @@ def pollution_analysis(water_network, nodes_to_pollute):
     max_polluted_step = 0
     max_polluted_time = 0
     for i in step_results_list:
-
         max_polluted_new = i['Number_of_polluted_nodes']
         if max_polluted_new > max_polluted:
             max_polluted = max_polluted_new
@@ -233,9 +225,9 @@ def pollution_analysis(water_network, nodes_to_pollute):
             max_polluted_time = i['Time [s]']
 
     results_dict = {
-        'Simulation finish polluted nodes': last_step_pollution_percent,
+        'Simulation end polluted nodes [%]': last_step_pollution_percent,
         'List of polluted nodes at simulation finish': step_results_list[-1]['Node status[true/false]'],
-        'Max polluted nodes': max_polluted,
+        'Max polluted nodes [%]': round(max_polluted/len(wn_dict['nodes'])*100, 2),
         'Timestamp max polluted nodes': max_polluted_time,
         'List of polluted nodes at max pollution time': step_results_list[max_polluted_step]['Node status[true/false]'],
         'List of polluted nodes at any time': step_results_list[max_polluted_step]['Node status[true/false]'] # Wrong, to correct
@@ -265,8 +257,8 @@ def simulate_trace(water_network, trace_node, step):
 
 
 # analyze_chemical_pollution(NUMBER_OF_ITERATIONS, wn)
-# brute_force_chemical_pollution(wn)
-nodes_to_pollute = ["121"]
-pollution_analysis(wn, nodes_to_pollute)
+brute_force_chemical_pollution_one_source(wn)
+# select_nodes = ["121"]
+# pollution_analysis(wn, select_nodes)
 # ax1 = wntr.graphics.plot_interactive_network(wn, node_attribute=trace['52200'], node_size=10,
 # title='Pollution in the system')
