@@ -175,7 +175,7 @@ def pollution_analysis(water_network, nodes_to_pollute):
 
         # Fill out alltime pollution DF
         #
-        # TO DO
+        # TODO: Fill out alltime pollution DF
         #
         # if step == 0:
         #    df_polluted_nodes_alltime = copy.deepcopy(series_polluted_nodes)
@@ -230,13 +230,14 @@ def pollution_analysis(water_network, nodes_to_pollute):
         'Max polluted nodes [%]': round(max_polluted/len(wn_dict['nodes'])*100, 2),
         'Timestamp max polluted nodes': max_polluted_time,
         'List of polluted nodes at max pollution time': step_results_list[max_polluted_step]['Node status[true/false]'],
-        'List of polluted nodes at any time': step_results_list[max_polluted_step]['Node status[true/false]'] # Wrong, to correct
+        'List of polluted nodes at any time': step_results_list[max_polluted_step]['Node status[true/false]'] # TODO Wrong, to correct
     }
     print('fin_final')
     return results_dict
 
 
 def simulate_trace(water_network, trace_node, step):
+    # TODO Change to use flowrates from nodes in hydraulical sim
     inj_node = trace_node['name']
 
     water_network.options.quality.parameter = 'TRACE'
