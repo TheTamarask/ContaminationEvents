@@ -1,6 +1,6 @@
 ; Filename: networks/Net2.inp
 ; WNTR: 1.0.0
-; Created: 2023-12-28 21:13:10
+; Created: 2023-12-29 20:40:32
 [TITLE]
 EPANET Example Network 2
 Example of modeling a 55-hour fluoride tracer study.
@@ -216,41 +216,6 @@ DEMAND CHARGE          0.0000
 ;Node      Type       Quality    Pattern   
 1          CONCEN     1.0        3         
 1          SETPOINT   2000000.0  PollutionPattern
-2          SETPOINT   2000000.0  PollutionPattern
-3          SETPOINT   2000000.0  PollutionPattern
-4          SETPOINT   2000000.0  PollutionPattern
-5          SETPOINT   2000000.0  PollutionPattern
-6          SETPOINT   2000000.0  PollutionPattern
-7          SETPOINT   2000000.0  PollutionPattern
-8          SETPOINT   2000000.0  PollutionPattern
-9          SETPOINT   2000000.0  PollutionPattern
-10         SETPOINT   2000000.0  PollutionPattern
-11         SETPOINT   2000000.0  PollutionPattern
-12         SETPOINT   2000000.0  PollutionPattern
-13         SETPOINT   2000000.0  PollutionPattern
-14         SETPOINT   2000000.0  PollutionPattern
-15         SETPOINT   2000000.0  PollutionPattern
-16         SETPOINT   2000000.0  PollutionPattern
-17         SETPOINT   2000000.0  PollutionPattern
-18         SETPOINT   2000000.0  PollutionPattern
-19         SETPOINT   2000000.0  PollutionPattern
-20         SETPOINT   2000000.0  PollutionPattern
-21         SETPOINT   2000000.0  PollutionPattern
-22         SETPOINT   2000000.0  PollutionPattern
-23         SETPOINT   2000000.0  PollutionPattern
-24         SETPOINT   2000000.0  PollutionPattern
-25         SETPOINT   2000000.0  PollutionPattern
-27         SETPOINT   2000000.0  PollutionPattern
-28         SETPOINT   2000000.0  PollutionPattern
-29         SETPOINT   2000000.0  PollutionPattern
-30         SETPOINT   2000000.0  PollutionPattern
-31         SETPOINT   2000000.0  PollutionPattern
-32         SETPOINT   2000000.0  PollutionPattern
-33         SETPOINT   2000000.0  PollutionPattern
-34         SETPOINT   2000000.0  PollutionPattern
-35         SETPOINT   2000000.0  PollutionPattern
-36         SETPOINT   2000000.0  PollutionPattern
-26         SETPOINT   2000000.0  PollutionPattern
 
 [REACTIONS]
 ;Type           Pipe/Tank               Coefficient
