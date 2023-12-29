@@ -1,5 +1,5 @@
 import copy
-
+from time import perf_counter
 import numpy as np
 import wntr
 import pandas as pd
@@ -12,6 +12,7 @@ START_HOUR_OF_POLLUTION = 0
 END_HOUR_OF_POLLUTION = 5
 NUMBER_OF_ITERATIONS = 5
 POLLUTION_THRESHOLD = 300
+MAX_THREADS = 6
 
 # Create a water network model and dictionary
 inp_file = 'networks/Net2.inp'
@@ -68,6 +69,8 @@ def analyze_chemical_pollution(iterations, water_network):
 
 
 def brute_force_chemical_pollution_one_source(water_network):
+    # Start time measure
+    start_time = perf_counter()
     water_network_dict = wntr.network.to_dict(water_network)
 
     dataframe_structure = {
@@ -88,14 +91,60 @@ def brute_force_chemical_pollution_one_source(water_network):
 
         pollution_results.loc[len(pollution_results)] = dataframe_structure
 
+    # Prepare results
     pollution_results_alltime = copy.deepcopy(pollution_results)
     pollution_results_alltime = pollution_results_alltime.sort_values(by=['Max polluted nodes [%]'], ascending=False)
     pollution_results = pollution_results.sort_values(by=['Simulation end polluted nodes [%]'], ascending=False)
+    # Stop time measure
+    end_time = perf_counter()
+    duration = end_time-start_time
+
     return_dict = {
         'Alltime best node': pollution_results_alltime.iloc[0]['Node'],
         'Alltime best pollution [%]': pollution_results_alltime.iloc[0]['Max polluted nodes [%]'],
         'Sim end best node': pollution_results.iloc[0]['Node'],
-        'Sim end best pollution': pollution_results_alltime.iloc[0]['Simulation end polluted nodes [%]']
+        'Sim end best pollution': pollution_results_alltime.iloc[0]['Simulation end polluted nodes [%]'],
+        'Duration': duration
+    }
+    return return_dict
+
+
+def brute_force_chemical_pollution_two_source(water_network):
+    # Start time measure
+    start_time = perf_counter()
+    water_network_dict = wntr.network.to_dict(water_network)
+
+    dataframe_structure = {
+        'Node': [],
+        'Simulation end polluted nodes [%]': [],
+        'Max polluted nodes [%]': []
+    }
+    pollution_results = pd.DataFrame(dataframe_structure)
+    # Running simulations of pollution for all the nodes
+    for i in range(len(water_network_dict['nodes'])):
+        for j in range(len(water_network_dict['nodes'])):
+            t_nodes_to_pollute = [water_network_dict['nodes'][i]['name'], water_network_dict['nodes'][j]['name']]
+            analysis_results = pollution_analysis(water_network, t_nodes_to_pollute)
+            dataframe_structure['Node'] = t_nodes_to_pollute[0] + ' ' + t_nodes_to_pollute[1]
+            dataframe_structure['Simulation end polluted nodes [%]'] = analysis_results['Simulation end polluted nodes [%]']
+            dataframe_structure['Max polluted nodes [%]'] = analysis_results['Max polluted nodes [%]']
+
+            pollution_results.loc[len(pollution_results)] = dataframe_structure
+
+    # Prepare results
+    pollution_results_alltime = copy.deepcopy(pollution_results)
+    pollution_results_alltime = pollution_results_alltime.sort_values(by=['Max polluted nodes [%]'], ascending=False)
+    pollution_results = pollution_results.sort_values(by=['Simulation end polluted nodes [%]'], ascending=False)
+    # Stop time measure
+    end_time = perf_counter()
+    duration = end_time-start_time
+
+    return_dict = {
+        'Alltime best node': pollution_results_alltime.iloc[0]['Node'],
+        'Alltime best pollution [%]': pollution_results_alltime.iloc[0]['Max polluted nodes [%]'],
+        'Sim end best node': pollution_results.iloc[0]['Node'],
+        'Sim end best pollution [%]': pollution_results_alltime.iloc[0]['Simulation end polluted nodes [%]'],
+        'Duration': duration
     }
     return return_dict
 
@@ -114,7 +163,7 @@ def pollution_analysis(water_network, nodes_to_pollute):
             if node['name'] == element:
                 polluted_node = node
                 break
-        print(polluted_node['name'])
+        # print(polluted_node['name'])
         water_network.add_source('PollutionSource_'+polluted_node['name'], polluted_node['name'], 'SETPOINT', 2000, 'PollutionPattern')
     water_network.options.quality.parameter = 'CHEMICAL'
 
@@ -197,11 +246,10 @@ def pollution_analysis(water_network, nodes_to_pollute):
                     if node['name'] == node_name:
                         traced_node = node
                         break
-                print("Symulacja kolejnego node: " + traced_node['name'])
-                # Do poprawy później
+                # print("Symulacja kolejnego node: " + traced_node['name'])
+                # TODO Do poprawy później TRACE
                 # trace_results = simulate_trace(water_network_for_trace, traced_node, step)
                 # list_flowrates.append(trace_results)
-        print("Przygotowanie wyników")
         step_results_dict = {
             'Step': step,
             'Time [s]': step * (15 * MINUTE),
@@ -211,7 +259,6 @@ def pollution_analysis(water_network, nodes_to_pollute):
             'Flowrates_per_polluted_node_per_step': list_flowrates
         }
         step_results_list.append(step_results_dict)
-        print('fin_step: ' + str(step))
 
     last_step_pollution_percent = round(step_results_list[-1]['Number_of_polluted_nodes']/len(wn_dict['nodes'])*100, 2)
     max_polluted = 0
@@ -232,8 +279,32 @@ def pollution_analysis(water_network, nodes_to_pollute):
         'List of polluted nodes at max pollution time': step_results_list[max_polluted_step]['Node status[true/false]'],
         'List of polluted nodes at any time': step_results_list[max_polluted_step]['Node status[true/false]'] # TODO Wrong, to correct
     }
-    print('fin_final')
     return results_dict
+
+
+def visualise_pollution(water_network, nodes_to_pollute):
+    results = pollution_analysis(water_network, nodes_to_pollute)
+    # Max pollution visualisation
+    max_pollution_df = results['List of polluted nodes at max pollution time']
+    max_pollution_df_trim = max_pollution_df[max_pollution_df['pollution']]
+    max_pollution_series = max_pollution_df_trim['name']
+    max_pollution_list = max_pollution_series.tolist()
+    ax1 = wntr.graphics.plot_interactive_network(wn, node_attribute=max_pollution_list, node_size=10,
+                                                 title='Maximum pollution reach in the system', filename='maximum.html')
+    # Sim end pollution visualisation
+    sim_end_pollution_df = results['List of polluted nodes at simulation finish']
+    sim_end_pollution_df_trim = sim_end_pollution_df[sim_end_pollution_df['pollution']]
+    sim_end_pollution_series = sim_end_pollution_df_trim['name']
+    sim_end_pollution_list = sim_end_pollution_series.tolist()
+    ax2 = wntr.graphics.plot_interactive_network(wn, node_attribute=sim_end_pollution_list, node_size=10,
+                                                 title='Simulation finish pollution reach in the system', filename='sim_end.html')
+    # Alltime pollution visualisation
+    alltime_pollution_df = results['List of polluted nodes at any time']
+    alltime_pollution_df_trim = alltime_pollution_df[sim_end_pollution_df['pollution']]
+    alltime_pollution_series = alltime_pollution_df_trim['name']
+    alltime_pollution_list = alltime_pollution_series.tolist()
+    ax3 = wntr.graphics.plot_interactive_network(wn, node_attribute=alltime_pollution_list, node_size=10,
+                                                 title='Alltime pollution reach in the system', filename='alltime.html')
 
 
 def simulate_trace(water_network, trace_node, step):
@@ -256,10 +327,10 @@ def simulate_trace(water_network, trace_node, step):
     }
     return results_dictionary
 
-
-# analyze_chemical_pollution(NUMBER_OF_ITERATIONS, wn)
-brute_force_chemical_pollution_one_source(wn)
-# select_nodes = ["121"]
+select_nodes = ["1"]
+visualise_pollution(wn, select_nodes)
+# print(brute_force_chemical_pollution_two_source(wn))
+# print(brute_force_chemical_pollution_one_source(wn))
 # pollution_analysis(wn, select_nodes)
 # ax1 = wntr.graphics.plot_interactive_network(wn, node_attribute=trace['52200'], node_size=10,
 # title='Pollution in the system')
