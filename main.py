@@ -4,31 +4,19 @@ import numpy as np
 import wntr
 import pandas as pd
 import concurrent.futures
+import json
 
 # Constants
 MINUTE = 60
 HOUR = 60 * MINUTE
 HOURS_OF_SIMULATION = 24
-START_HOUR_OF_POLLUTION = 0
+START_HOUR_OF_POLLUTION = 3
 END_HOUR_OF_POLLUTION = 5
-NUMBER_OF_ITERATIONS = 5
 POLLUTION_THRESHOLD = 300
+POLLUTION_AMOUNT = 2000
 MAX_THREADS = 6
 
-# Create a water network model and dictionary
-inp_file = 'networks/Net2.inp'
-wn = wntr.network.WaterNetworkModel(inp_file)
-
-# Define pollution pattern
-pollution_pattern = wntr.network.elements.Pattern.binary_pattern('PollutionPattern',
-                                                                 start_time=START_HOUR_OF_POLLUTION * HOUR,
-                                                                 end_time=END_HOUR_OF_POLLUTION * HOUR,
-                                                                 duration=wn.options.time.duration,
-                                                                 step_size=wn.options.time.pattern_timestep)
-wn.add_pattern('PollutionPattern', pollution_pattern)
-
-
-def analyze_chemical_pollution(iterations, water_network):
+def old_analyze_chemical_pollution(iterations, water_network):
     wn_dict = wntr.network.to_dict(water_network)
     water_network.options.quality.parameter = 'CHEMICAL'
 
@@ -69,7 +57,7 @@ def analyze_chemical_pollution(iterations, water_network):
     print(pollution_results)
 
 
-def brute_force_chemical_pollution_one_source(water_network):
+def brute_force_single_source(water_network):
     # Start time measure
     start_time = perf_counter()
     water_network_dict = wntr.network.to_dict(water_network)
@@ -110,7 +98,7 @@ def brute_force_chemical_pollution_one_source(water_network):
     return return_dict
 
 
-def brute_force_chemical_pollution_two_source(water_network):
+def brute_force_two_source(water_network):
     # Start time measure
     start_time = perf_counter()
     water_network_dict = wntr.network.to_dict(water_network)
@@ -148,6 +136,196 @@ def brute_force_chemical_pollution_two_source(water_network):
         'Duration': duration
     }
     return return_dict
+
+
+def pollution_analysis(water_network, nodes_to_pollute, i=-1, j=-1):
+    # Create dictionary
+    wn_dict = wntr.network.to_dict(water_network)
+
+    # Define timesteps of the simulation for CHEMICAL ...
+    water_network.options.time.start_clocktime = 0
+    water_network.options.time.duration = HOURS_OF_SIMULATION * HOUR
+    water_network.options.time.pattern_timestep = HOUR
+    water_network.options.time.hydraulic_timestep = 15 * MINUTE
+    water_network.options.time.quality_timestep = 15 * MINUTE
+    water_network.options.time.report_timestep = 15 * MINUTE
+    sim = wntr.sim.EpanetSimulator(water_network)
+
+    # Define pollution pattern
+    pollution_pattern = wntr.network.elements.Pattern.binary_pattern('PollutionPattern',
+                                                                     start_time=START_HOUR_OF_POLLUTION * HOUR,
+                                                                     end_time=END_HOUR_OF_POLLUTION * HOUR,
+                                                                     duration=water_network.options.time.duration,
+                                                                     step_size=water_network.options.time.pattern_timestep)
+    water_network.add_pattern('PollutionPattern', pollution_pattern)
+
+    # Poison select nodes in CHEMICAL sim network
+    for element in nodes_to_pollute:
+        polluted_node = None
+        for node in wn_dict['nodes']:
+            if node['name'] == element:
+                polluted_node = node
+                break
+        water_network.add_source('PollutionSource_'+polluted_node['name'], polluted_node['name'], 'SETPOINT',
+                                 POLLUTION_AMOUNT, 'PollutionPattern')
+    water_network.options.quality.parameter = 'CHEMICAL'
+
+    # Prepare results structures
+    step_results_list = list()
+    df_polluted_nodes_alltime = pd.DataFrame()
+    results_dict = {
+        'Simulation end polluted nodes [%]': [],
+        'List of polluted nodes at simulation finish': [],
+        'Max polluted nodes [%]': [],
+        'Timestamp max polluted nodes': [],
+        'List of polluted nodes at max pollution time': [],
+        'List of polluted nodes at any time': []
+    }
+    step_results_dict = {
+        'Step': [],
+        'Time [s]': [],
+        'Nodes': [],
+        'Number_of_polluted_nodes': [],
+        'Node status[true/false]': []
+    }
+    flowrates_per_polluted_node_per_step_dict = {
+        'Traced_node': [],
+        'Flowrates': []
+    }
+
+    # Then run simulation step by step
+    sim_steps = int(HOURS_OF_SIMULATION * HOUR / (15 * MINUTE))  # hours
+
+    for step in range(0, sim_steps + 1, 1):
+        water_network.options.time.duration = step * (15 * MINUTE)
+        if (i == -1) and (j == -1):
+            simulation_results = sim.run_sim()
+        else:
+            file_prefix = str(i)+str(j)
+            simulation_results = sim.run_sim(file_prefix=file_prefix)
+
+        pollution_data = simulation_results.node['quality'].loc[step * (15 * MINUTE), :]
+
+        # Get list of polluted nodes
+        # Extract the number of junctions that are polluted above the threshold
+        series_polluted_nodes = pollution_data.ge(POLLUTION_THRESHOLD)
+        series_polluted_nodes_trimmed = series_polluted_nodes[series_polluted_nodes]
+        df_polluted_nodes = series_polluted_nodes.to_frame().reset_index()
+        df_polluted_nodes = df_polluted_nodes.rename(columns={step * (15 * MINUTE): 'pollution'})
+        number_of_polluted_nodes = sum(series_polluted_nodes_trimmed)
+
+        # Fill out alltime pollution DF
+        if step == 0:
+            df_polluted_nodes_alltime = copy.deepcopy(df_polluted_nodes)
+        else:
+            for index in range(0, len(df_polluted_nodes)):
+                if df_polluted_nodes.iloc[[index]]['pollution'].at[index]:
+                    test=df_polluted_nodes_alltime.at[index, 'pollution']
+                    df_polluted_nodes_alltime.at[index, 'pollution'] = True
+                    test = df_polluted_nodes_alltime.at[index, 'pollution']
+
+        step_results_dict = {
+            'Step': step,
+            'Time [s]': step * (15 * MINUTE),
+            'Nodes': nodes_to_pollute,
+            'Number_of_polluted_nodes': number_of_polluted_nodes,
+            'Node status[true/false]': df_polluted_nodes
+        }
+        step_results_list.append(step_results_dict)
+
+    series_alltime_polluted_nodes = df_polluted_nodes_alltime.loc[:, 'pollution']
+    series_alltime_polluted_nodes_trimmed = series_alltime_polluted_nodes[series_alltime_polluted_nodes]
+    alltime_pollution_percent = round(sum(series_alltime_polluted_nodes_trimmed) / len(wn_dict['nodes']), 2)
+
+    last_step_pollution_percent = round(step_results_list[-1]['Number_of_polluted_nodes']/len(wn_dict['nodes'])*100, 2)
+    max_polluted = 0
+    max_polluted_step = 0
+    max_polluted_time = 0
+    for i in step_results_list:
+        max_polluted_new = i['Number_of_polluted_nodes']
+        if max_polluted_new > max_polluted:
+            max_polluted = max_polluted_new
+            max_polluted_step = i['Step']
+            max_polluted_time = i['Time [s]']
+
+    results_dict = {
+        'Simulation end polluted nodes [%]': last_step_pollution_percent,
+        'List of polluted nodes at simulation finish': step_results_list[-1]['Node status[true/false]'],
+        'Max polluted nodes [%]': round(max_polluted/len(wn_dict['nodes'])*100, 2),
+        'Timestamp max polluted nodes': max_polluted_time,
+        'List of polluted nodes at max pollution time': step_results_list[max_polluted_step]['Node status[true/false]'],
+        'Alltime polluted nodes [%]': alltime_pollution_percent,
+        'List of alltime polluted nodes': df_polluted_nodes_alltime
+    }
+    return results_dict
+
+
+def visualise_pollution(water_network, nodes_to_pollute, start_clocktime=0):
+    results = pollution_analysis(water_network, nodes_to_pollute, start_clocktime)
+    # Max pollution visualisation
+    max_pollution_df = results['List of polluted nodes at max pollution time']
+    max_pollution_df_trim = max_pollution_df[max_pollution_df['pollution']]
+    max_pollution_series = max_pollution_df_trim['name']
+    max_pollution_list = max_pollution_series.tolist()
+    ax1 = wntr.graphics.plot_interactive_network(water_network, node_attribute=max_pollution_list, node_size=10,
+                                                 title='Maximum pollution reach in the system', filename='maximum.html')
+    # Sim end pollution visualisation
+    sim_end_pollution_df = results['List of polluted nodes at simulation finish']
+    sim_end_pollution_df_trim = sim_end_pollution_df[sim_end_pollution_df['pollution']]
+    sim_end_pollution_series = sim_end_pollution_df_trim['name']
+    sim_end_pollution_list = sim_end_pollution_series.tolist()
+    ax2 = wntr.graphics.plot_interactive_network(water_network, node_attribute=sim_end_pollution_list, node_size=10,
+                                                 title='Simulation finish pollution reach in the system', filename='sim_end.html')
+    # Alltime pollution visualisation
+    alltime_pollution_df = results['List of polluted nodes at any time']
+    alltime_pollution_df_trim = alltime_pollution_df[sim_end_pollution_df['pollution']]
+    alltime_pollution_series = alltime_pollution_df_trim['name']
+    alltime_pollution_list = alltime_pollution_series.tolist()
+    ax3 = wntr.graphics.plot_interactive_network(water_network, node_attribute=alltime_pollution_list, node_size=10,
+                                                 title='Alltime pollution reach in the system', filename='alltime.html')
+
+
+def simulate_trace(water_network, trace_node, step):
+    # TODO Change to use flowrates from nodes in hydraulical sim
+    #inj_node = trace_node['name']
+    inj_node = trace_node
+
+    dict = water_network.to_dict()
+    water_network.options.time.duration = step * (15 * MINUTE)
+    # Simulate hydraulics
+    sim = wntr.sim.EpanetSimulator(water_network)
+    results = sim.run_sim()
+
+    flowrates = results.node['quality'].loc[step * (15 * MINUTE), :]
+    flowrates = flowrates.to_frame()
+    # Prepare results
+    results_dictionary = {
+        'Node': [trace_node['name']],
+        'Flowrates': [flowrates]
+    }
+    return results_dictionary
+
+
+def get_results_bruteforce(water_network_path, two_source=False):
+
+    # Create a water network model
+    inp_file = water_network_path
+    wn = wntr.network.WaterNetworkModel(inp_file)
+    #Get the results
+    if not two_source:
+        results_dict = brute_force_single_source(wn)
+    else:
+        results_dict = brute_force_single_source(wn)
+
+    # Save to textfile
+    filename = "brute_force_results_"+str(000)+"_"+inp_file[9:]+".txt"
+    with open(filename, 'w') as results_file:
+        for key, value in results_dict.items():
+            results_file.write('%s:%s\n' % (key, value))
+
+
+def pipe_diameter_algorithm(water_network):
+    wn_dict = water_network.to_dict()
 
 
 # TODO popraw wielowątkowość - nie odpalają się kolejne wątki
@@ -204,196 +382,33 @@ def pollution_analysis_worker(wn_dict, i, j, water_n, df_structure, poll_results
     del water_n
 
 
-def pollution_analysis(water_network, nodes_to_pollute, i=-1, j=-1):
-    # Create dictionary
-    wn_dict = wntr.network.to_dict(water_network)
-
-    # Copy Water network for later use in trace analysis
-    water_network_for_trace = copy.deepcopy(water_network)
-
-    # Poison select nodes in CHEMICAL sim network
-    for element in nodes_to_pollute:
-        polluted_node = None
-        for node in wn_dict['nodes']:
-            if node['name'] == element:
-                polluted_node = node
-                break
-        # print(polluted_node['name'])
-        water_network.add_source('PollutionSource_'+polluted_node['name'], polluted_node['name'], 'SETPOINT', 2000, 'PollutionPattern')
-    water_network.options.quality.parameter = 'CHEMICAL'
-
-    # Define timesteps of the simulation for CHEMICAL ...
-    water_network.options.time.start_clocktime = 0
-    water_network.options.time.duration = HOURS_OF_SIMULATION * HOUR
-    water_network.options.time.pattern_timestep = HOUR
-    water_network.options.time.hydraulic_timestep = 15 * MINUTE
-    water_network.options.time.quality_timestep = 15 * MINUTE
-    water_network.options.time.report_timestep = 15 * MINUTE
-    sim = wntr.sim.EpanetSimulator(water_network)
-    # and TRACE...
-    water_network_for_trace.options.time.start_clocktime = 0
-    water_network_for_trace.options.time.duration = HOURS_OF_SIMULATION * HOUR
-    water_network_for_trace.options.time.pattern_timestep = HOUR
-    water_network_for_trace.options.time.hydraulic_timestep = 15 * MINUTE
-    water_network_for_trace.options.time.quality_timestep = 15 * MINUTE
-    water_network_for_trace.options.time.report_timestep = 15 * MINUTE
-    # Prepare results structures
-    step_results_list = list()
-    df_polluted_nodes_alltime = pd.DataFrame()
-    results_dict = {
-        'Simulation end polluted nodes [%]': [],
-        'List of polluted nodes at simulation finish': [],
-        'Max polluted nodes [%]': [],
-        'Timestamp max polluted nodes': [],
-        'List of polluted nodes at max pollution time': [],
-        'List of polluted nodes at any time': []
-    }
-    step_results_dict = {
-        'Step': [],
-        'Time [s]': [],
-        'Nodes': [],
-        'Number_of_polluted_nodes': [],
-        'Node status[true/false]': [],
-        'Flowrates_per_polluted_node_per_step': []
-    }
-    flowrates_per_polluted_node_per_step_dict = {
-        'Traced_node': [],
-        'Flowrates': []
-    }
-
-    # Then run simulation step by step
-    sim_steps = int(HOURS_OF_SIMULATION * HOUR / (15 * MINUTE))  # hours
-
-    for step in range(0, sim_steps + 1, 1):
-        wn.options.time.duration = step * (15 * MINUTE)
-        if (i == -1) and (j == -1):
-            simulation_results = sim.run_sim()
-        else:
-            file_prefix = str(i)+str(j)
-            simulation_results = sim.run_sim(file_prefix=file_prefix)
-
-        pollution_data = simulation_results.node['quality'].loc[step * (15 * MINUTE), :]
-
-        # Get list of polluted nodes
-        # Extract the number of junctions that are polluted above the threshold
-        series_polluted_nodes = pollution_data.ge(POLLUTION_THRESHOLD)
-        series_polluted_nodes_trimmed = series_polluted_nodes[series_polluted_nodes]
-        df_polluted_nodes = series_polluted_nodes.to_frame().reset_index()
-        df_polluted_nodes = df_polluted_nodes.rename(columns={step * (15 * MINUTE): 'pollution'})
-        number_of_polluted_nodes = sum(series_polluted_nodes_trimmed)
-
-        # Fill out alltime pollution DF
-        # TODO: Fill out alltime pollution DF
-        if step == 0:
-            df_polluted_nodes_alltime = copy.deepcopy(df_polluted_nodes)
-        else:
-            for index in range(0, len(df_polluted_nodes)):
-                if df_polluted_nodes.iloc[[index]]['pollution'].at[index]:
-                    test=df_polluted_nodes_alltime.at[index, 'pollution']
-                    df_polluted_nodes_alltime.at[index, 'pollution'] = True
-                    test = df_polluted_nodes_alltime.at[index, 'pollution']
-
-        # start trace simulation for each of polluted nodes
-        list_flowrates = list()
-        if number_of_polluted_nodes == 0:
-            list_flowrates.append(None)
-        else:
-            for node_name in df_polluted_nodes['name']:
-                traced_node = None
-                for node in wn_dict['nodes']:
-                    if node['name'] == node_name:
-                        traced_node = node
-                        break
-                # print("Symulacja kolejnego node: " + traced_node['name'])
-                # TODO Do poprawy później TRACE
-                # trace_results = simulate_trace(water_network_for_trace, traced_node, step)
-                # list_flowrates.append(trace_results)
-        step_results_dict = {
-            'Step': step,
-            'Time [s]': step * (15 * MINUTE),
-            'Nodes': nodes_to_pollute,
-            'Number_of_polluted_nodes': number_of_polluted_nodes,
-            'Node status[true/false]': df_polluted_nodes,
-            'Flowrates_per_polluted_node_per_step': list_flowrates
-        }
-        step_results_list.append(step_results_dict)
-
-    series_alltime_polluted_nodes = df_polluted_nodes_alltime.loc[:,'pollution']
-    series_alltime_polluted_nodes_trimmed = series_alltime_polluted_nodes[series_alltime_polluted_nodes]
-    alltime_pollution_percent = round(sum(series_alltime_polluted_nodes_trimmed) / len(wn_dict['nodes']), 2)
-
-    last_step_pollution_percent = round(step_results_list[-1]['Number_of_polluted_nodes']/len(wn_dict['nodes'])*100, 2)
-    max_polluted = 0
-    max_polluted_step = 0
-    max_polluted_time = 0
-    for i in step_results_list:
-        max_polluted_new = i['Number_of_polluted_nodes']
-        if max_polluted_new > max_polluted:
-            max_polluted = max_polluted_new
-            max_polluted_step = i['Step']
-            max_polluted_time = i['Time [s]']
-
-    results_dict = {
-        'Simulation end polluted nodes [%]': last_step_pollution_percent,
-        'List of polluted nodes at simulation finish': step_results_list[-1]['Node status[true/false]'],
-        'Max polluted nodes [%]': round(max_polluted/len(wn_dict['nodes'])*100, 2),
-        'Timestamp max polluted nodes': max_polluted_time,
-        'List of polluted nodes at max pollution time': step_results_list[max_polluted_step]['Node status[true/false]'],
-        'Alltime polluted nodes [%]': alltime_pollution_percent,
-        'List of alltime polluted nodes': df_polluted_nodes_alltime
-    }
-    return results_dict
-
-
-def visualise_pollution(water_network, nodes_to_pollute):
-    results = pollution_analysis(water_network, nodes_to_pollute)
-    # Max pollution visualisation
-    max_pollution_df = results['List of polluted nodes at max pollution time']
-    max_pollution_df_trim = max_pollution_df[max_pollution_df['pollution']]
-    max_pollution_series = max_pollution_df_trim['name']
-    max_pollution_list = max_pollution_series.tolist()
-    ax1 = wntr.graphics.plot_interactive_network(wn, node_attribute=max_pollution_list, node_size=10,
-                                                 title='Maximum pollution reach in the system', filename='maximum.html')
-    # Sim end pollution visualisation
-    sim_end_pollution_df = results['List of polluted nodes at simulation finish']
-    sim_end_pollution_df_trim = sim_end_pollution_df[sim_end_pollution_df['pollution']]
-    sim_end_pollution_series = sim_end_pollution_df_trim['name']
-    sim_end_pollution_list = sim_end_pollution_series.tolist()
-    ax2 = wntr.graphics.plot_interactive_network(wn, node_attribute=sim_end_pollution_list, node_size=10,
-                                                 title='Simulation finish pollution reach in the system', filename='sim_end.html')
-    # Alltime pollution visualisation
-    alltime_pollution_df = results['List of polluted nodes at any time']
-    alltime_pollution_df_trim = alltime_pollution_df[sim_end_pollution_df['pollution']]
-    alltime_pollution_series = alltime_pollution_df_trim['name']
-    alltime_pollution_list = alltime_pollution_series.tolist()
-    ax3 = wntr.graphics.plot_interactive_network(wn, node_attribute=alltime_pollution_list, node_size=10,
-                                                 title='Alltime pollution reach in the system', filename='alltime.html')
-
-
-def simulate_trace(water_network, trace_node, step):
-    # TODO Change to use flowrates from nodes in hydraulical sim
-    inj_node = trace_node['name']
-
-    water_network.options.quality.parameter = 'TRACE'
-    water_network.options.quality.trace_node = inj_node
-    water_network.options.time.duration = step * (15 * MINUTE)
-    # Simulate hydraulics
-    sim = wntr.sim.EpanetSimulator(water_network)
-    results = sim.run_sim()
-
-    flowrates = results.node['quality'].loc[step * (15 * MINUTE), :]
-    flowrates = flowrates.to_frame()
-    # Prepare results
-    results_dictionary = {
-        'Node': [trace_node['name']],
-        'Flowrates': [flowrates]
-    }
-    return results_dictionary
-
-
 if __name__ == '__main__':
-    nodes={'5'}
-    print(pollution_analysis(wn, nodes))
+    # Create a water network model and dictionary
+    #inp_file = 'networks/Net3.inp'
+    #wn = wntr.network.WaterNetworkModel(inp_file)
+    #wn_dict = wn.to_dict()
+    # Define pollution pattern
+    #pollution_pattern = wntr.network.elements.Pattern.binary_pattern('PollutionPattern',
+     #                                                                start_time=START_HOUR_OF_POLLUTION * HOUR,
+     #                                                                end_time=END_HOUR_OF_POLLUTION * HOUR,
+     #                                                                duration=wn.options.time.duration,
+     #                                                                step_size=wn.options.time.pattern_timestep)
+    #wn.add_pattern('PollutionPattern', pollution_pattern)
+
+
+    #nodes = {wn.node_name_list[0]}
+    #visualise_pollution(wn,nodes)
+    get_results_bruteforce("networks/Net1.inp")
+
+    #pipe_diameter_algorithm(wn)
+
+
+    #nodes={'5'}
+    #ollution_analysis(wn, nodes)
+    #sim_steps = int(HOURS_OF_SIMULATION * HOUR / (15 * MINUTE))  # hours
+
+    #for krok in range(0, sim_steps + 1, 1):
+        #simulate_trace(wn, nodes, krok)
     #brute_force_chemical_pollution_two_source_multithreaded(wn)
     #print(brute_force_chemical_pollution_one_source(wn))
     #select_nodes = ["1"]
