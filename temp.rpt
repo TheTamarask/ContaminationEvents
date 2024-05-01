@@ -1,4 +1,4 @@
-  Page 1                                    Sun Apr 14 22:26:20 2024
+  Page 1                                    Wed May 01 08:55:20 2024
 
   ******************************************************************
   *                           E P A N E T                          *
@@ -7,6 +7,431 @@
   *                         Version 2.2                            *
   ******************************************************************
   
-  Analysis begun Sun Apr 14 22:26:20 2024
+  Analysis begun Wed May 01 08:55:20 2024
 
-  Analysis ended Sun Apr 14 22:26:20 2024
+   
+  Hydraulic Status:
+  -----------------------------------------------------------------------
+     0:00:00: Balanced after 5 trials
+     0:00:00: Reservoir River is emptying
+     0:00:00: Reservoir Lake is closed
+     0:00:00: Tank 1 is filling at 13.10 ft
+     0:00:00: Tank 2 is emptying at 23.50 ft
+     0:00:00: Tank 3 is filling at 29.00 ft
+   
+     0:15:00: Balanced after 2 trials
+   
+     0:30:00: Balanced after 2 trials
+   
+     0:45:00: Balanced after 2 trials
+   
+     1:00:00: Pump 10 changed by timer control
+     1:00:00: Balanced after 7 trials
+     1:00:00: Reservoir Lake is emptying
+     1:00:00: Pump 10 changed from closed to open
+   
+     1:15:00: Balanced after 2 trials
+   
+     1:30:00: Balanced after 2 trials
+   
+     1:45:00: Balanced after 2 trials
+   
+     2:00:00: Balanced after 3 trials
+     2:00:00: Tank 2 is filling at 21.21 ft
+   
+     2:15:00: Balanced after 2 trials
+   
+     2:30:00: Balanced after 2 trials
+   
+     2:45:00: Balanced after 2 trials
+   
+     3:00:00: Balanced after 2 trials
+   
+     3:15:00: Balanced after 2 trials
+   
+     3:30:00: Balanced after 2 trials
+   
+     3:45:00: Balanced after 2 trials
+   
+     4:00:00: Balanced after 3 trials
+   
+     4:15:00: Balanced after 2 trials
+   
+     4:16:05: Pump 335 changed by Tank 1 control
+     4:16:05: Pipe 330 changed by Tank 1 control
+     4:16:05: Balanced after 4 trials
+     4:16:05: Pipe 330 changed from closed to open
+     4:16:05: Pump 335 changed from open to closed
+   
+     4:30:00: Balanced after 2 trials
+   
+     4:45:00: Balanced after 2 trials
+   
+     5:00:00: Balanced after 3 trials
+     5:00:00: Tank 3 is emptying at 34.34 ft
+   
+     5:15:00: Balanced after 2 trials
+   
+     5:30:00: Balanced after 2 trials
+   
+     5:45:00: Balanced after 2 trials
+   
+     6:00:00: Balanced after 3 trials
+     6:00:00: Tank 3 is filling at 34.18 ft
+   
+     6:15:00: Balanced after 2 trials
+   
+     6:30:00: Balanced after 2 trials
+   
+     6:45:00: Balanced after 2 trials
+   
+     7:00:00: Balanced after 3 trials
+   
+     7:15:00: Balanced after 1 trials
+   
+     7:30:00: Balanced after 1 trials
+   
+     7:45:00: Balanced after 1 trials
+   
+     8:00:00: Balanced after 2 trials
+   
+     8:15:00: Balanced after 2 trials
+   
+     8:30:00: Balanced after 2 trials
+   
+     8:45:00: Balanced after 2 trials
+   
+     9:00:00: Balanced after 3 trials
+     9:00:00: Tank 3 is emptying at 35.19 ft
+   
+     9:15:00: Balanced after 2 trials
+   
+     9:30:00: Balanced after 2 trials
+   
+     9:45:00: Balanced after 2 trials
+     9:45:00: Tank 1 is emptying at 22.16 ft
+   
+    10:00:00: Balanced after 2 trials
+    10:00:00: Tank 1 is filling at 22.15 ft
+   
+    10:15:00: Balanced after 2 trials
+   
+    10:30:00: Balanced after 2 trials
+    10:30:00: Tank 1 is emptying at 22.16 ft
+   
+    10:45:00: Balanced after 2 trials
+   
+    11:00:00: Balanced after 3 trials
+    11:00:00: Tank 2 is emptying at 27.66 ft
+   
+    11:15:00: Balanced after 2 trials
+   
+    11:30:00: Balanced after 2 trials
+   
+    11:45:00: Balanced after 2 trials
+   
+    12:00:00: Balanced after 2 trials
+    12:00:00: Tank 2 is filling at 27.58 ft
+   
+    12:15:00: Balanced after 2 trials
+   
+    12:30:00: Balanced after 2 trials
+    12:30:00: Tank 2 is emptying at 27.59 ft
+   
+    12:45:00: Balanced after 2 trials
+   
+    13:00:00: Balanced after 3 trials
+    13:00:00: Tank 1 is filling at 21.72 ft
+    13:00:00: Tank 2 is filling at 27.59 ft
+   
+    13:15:00: Balanced after 2 trials
+   
+    13:30:00: Balanced after 2 trials
+    13:30:00: Tank 1 is emptying at 21.73 ft
+   
+    13:45:00: Balanced after 2 trials
+   
+    14:00:00: Balanced after 3 trials
+    14:00:00: Tank 1 is filling at 21.71 ft
+   
+    14:15:00: Balanced after 2 trials
+   
+    14:30:00: Balanced after 2 trials
+   
+    14:45:00: Balanced after 2 trials
+   
+    15:00:00: Pump 10 changed by timer control
+    15:00:00: Balanced after 5 trials
+    15:00:00: Reservoir Lake is closed
+    15:00:00: Tank 1 is emptying at 21.93 ft
+    15:00:00: Tank 2 is emptying at 28.13 ft
+    15:00:00: Pump 10 changed from open to closed
+   
+    15:15:00: Balanced after 2 trials
+   
+    15:30:00: Balanced after 2 trials
+   
+    15:45:00: Balanced after 2 trials
+   
+    16:00:00: Balanced after 3 trials
+   
+    16:15:00: Balanced after 2 trials
+   
+    16:30:00: Balanced after 2 trials
+   
+    16:45:00: Balanced after 2 trials
+   
+    17:00:00: Balanced after 2 trials
+   
+    17:15:00: Balanced after 2 trials
+   
+    17:30:00: Balanced after 2 trials
+   
+    17:45:00: Balanced after 2 trials
+   
+    18:00:00: Balanced after 2 trials
+    18:00:00: Tank 2 is filling at 27.59 ft
+   
+    18:15:00: Balanced after 2 trials
+    18:15:00: Tank 2 is emptying at 27.60 ft
+   
+    18:30:00: Balanced after 2 trials
+   
+    18:45:00: Balanced after 2 trials
+   
+    19:00:00: Balanced after 2 trials
+   
+    19:15:00: Balanced after 2 trials
+   
+    19:30:00: Balanced after 2 trials
+   
+    19:45:00: Balanced after 2 trials
+   
+    20:00:00: Balanced after 3 trials
+   
+    20:15:00: Balanced after 2 trials
+   
+    20:30:00: Balanced after 2 trials
+   
+    20:45:00: Balanced after 2 trials
+   
+    21:00:00: Balanced after 3 trials
+   
+    21:15:00: Balanced after 2 trials
+   
+    21:23:33: Pump 335 changed by Tank 1 control
+    21:23:33: Pipe 330 changed by Tank 1 control
+    21:23:33: Balanced after 5 trials
+    21:23:33: Tank 1 is filling at 17.10 ft
+    21:23:33: Tank 3 is filling at 29.69 ft
+    21:23:33: Pipe 330 changed from open to closed
+    21:23:33: Pump 335 changed from closed to open
+   
+    21:30:00: Balanced after 2 trials
+   
+    21:45:00: Balanced after 2 trials
+   
+    22:00:00: Balanced after 3 trials
+    22:00:00: Tank 1 is emptying at 17.28 ft
+   
+    22:15:00: Balanced after 2 trials
+   
+    22:30:00: Balanced after 2 trials
+   
+    22:45:00: Balanced after 2 trials
+   
+    23:00:00: Balanced after 3 trials
+   
+    23:15:00: Balanced after 2 trials
+   
+    23:30:00: Balanced after 2 trials
+   
+    23:45:00: Balanced after 2 trials
+   
+    24:00:00: Balanced after 3 trials
+    24:00:00: Tank 1 is filling at 15.88 ft
+   
+    24:15:00: Balanced after 2 trials
+   
+    24:30:00: Balanced after 2 trials
+   
+    24:45:00: Balanced after 2 trials
+   
+    25:00:00: Pump 10 changed by timer control
+    25:00:00: Balanced after 7 trials
+    25:00:00: Reservoir Lake is emptying
+    25:00:00: Pump 10 changed from closed to open
+   
+    25:15:00: Balanced after 2 trials
+   
+    25:30:00: Balanced after 2 trials
+   
+    25:45:00: Balanced after 2 trials
+   
+    26:00:00: Balanced after 3 trials
+    26:00:00: Tank 2 is filling at 21.82 ft
+   
+    26:15:00: Balanced after 2 trials
+   
+    26:30:00: Balanced after 2 trials
+   
+    26:45:00: Balanced after 2 trials
+   
+    26:59:04: Pump 335 changed by Tank 1 control
+    26:59:04: Pipe 330 changed by Tank 1 control
+    26:59:04: Balanced after 4 trials
+    26:59:04: Tank 3 is emptying at 34.43 ft
+    26:59:04: Pipe 330 changed from closed to open
+    26:59:04: Pump 335 changed from open to closed
+   
+    27:00:00: Balanced after 2 trials
+   
+    27:15:00: Balanced after 2 trials
+   
+    27:30:00: Balanced after 2 trials
+   
+    27:45:00: Balanced after 2 trials
+   
+    28:00:00: Balanced after 3 trials
+    28:00:00: Tank 3 is filling at 34.21 ft
+   
+    28:15:00: Balanced after 2 trials
+   
+    28:30:00: Balanced after 2 trials
+   
+    28:45:00: Balanced after 2 trials
+   
+    29:00:00: Balanced after 3 trials
+    29:00:00: Tank 3 is emptying at 34.46 ft
+   
+    29:15:00: Balanced after 2 trials
+   
+    29:30:00: Balanced after 2 trials
+   
+    29:45:00: Balanced after 2 trials
+   
+    30:00:00: Balanced after 3 trials
+    30:00:00: Tank 3 is filling at 34.32 ft
+   
+    30:15:00: Balanced after 2 trials
+   
+    30:30:00: Balanced after 2 trials
+   
+    30:45:00: Balanced after 2 trials
+   
+    31:00:00: Balanced after 3 trials
+   
+    31:15:00: Balanced after 1 trials
+   
+    31:30:00: Balanced after 1 trials
+   
+    31:45:00: Balanced after 1 trials
+   
+    32:00:00: Balanced after 2 trials
+   
+    32:15:00: Balanced after 2 trials
+   
+    32:30:00: Balanced after 2 trials
+   
+    32:45:00: Balanced after 2 trials
+   
+    33:00:00: Balanced after 3 trials
+    33:00:00: Tank 3 is emptying at 35.36 ft
+   
+    33:15:00: Balanced after 2 trials
+    33:15:00: Tank 1 is emptying at 22.43 ft
+   
+    33:30:00: Balanced after 2 trials
+   
+    33:45:00: Balanced after 2 trials
+   
+    34:00:00: Balanced after 2 trials
+   
+    34:15:00: Balanced after 2 trials
+   
+    34:30:00: Balanced after 2 trials
+   
+    34:45:00: Balanced after 2 trials
+   
+    35:00:00: Balanced after 3 trials
+    35:00:00: Tank 2 is emptying at 27.88 ft
+   
+    35:15:00: Balanced after 2 trials
+   
+    35:30:00: Balanced after 2 trials
+   
+    35:45:00: Balanced after 2 trials
+   
+    36:00:00: Balanced after 2 trials
+    36:00:00: Tank 2 is filling at 27.80 ft
+   
+    36:15:00: Balanced after 2 trials
+   
+    36:30:00: Balanced after 2 trials
+    36:30:00: Tank 2 is emptying at 27.81 ft
+   
+    36:45:00: Balanced after 2 trials
+   
+    37:00:00: Balanced after 3 trials
+    37:00:00: Tank 1 is filling at 21.91 ft
+    37:00:00: Tank 2 is filling at 27.80 ft
+   
+    37:15:00: Balanced after 2 trials
+    37:15:00: Tank 1 is emptying at 21.92 ft
+   
+    37:30:00: Balanced after 2 trials
+   
+    37:45:00: Balanced after 2 trials
+   
+    38:00:00: Balanced after 3 trials
+    38:00:00: Tank 1 is filling at 21.90 ft
+   
+    38:15:00: Balanced after 2 trials
+   
+    38:30:00: Balanced after 2 trials
+   
+    38:45:00: Balanced after 2 trials
+   
+    39:00:00: Pump 10 changed by timer control
+    39:00:00: Balanced after 5 trials
+    39:00:00: Reservoir Lake is closed
+    39:00:00: Tank 1 is emptying at 22.11 ft
+    39:00:00: Tank 2 is emptying at 28.33 ft
+    39:00:00: Pump 10 changed from open to closed
+   
+    39:15:00: Balanced after 2 trials
+   
+    39:30:00: Balanced after 2 trials
+   
+    39:45:00: Balanced after 2 trials
+   
+    40:00:00: Balanced after 3 trials
+   
+    40:15:00: Balanced after 2 trials
+   
+    40:30:00: Balanced after 2 trials
+   
+    40:45:00: Balanced after 2 trials
+   
+    41:00:00: Balanced after 2 trials
+   
+    41:15:00: Balanced after 2 trials
+   
+    41:30:00: Balanced after 2 trials
+   
+    41:45:00: Balanced after 2 trials
+   
+    42:00:00: Balanced after 2 trials
+    42:00:00: Tank 2 is filling at 27.76 ft
+   
+  Water Quality Mass Balance (mg)
+  ================================
+  Initial Mass:      0.00000e+000
+  Mass Inflow:       1.18117e+014
+  Mass Outflow:      9.16285e+013
+  Mass Reacted:      0.00000e+000
+  Final Mass:        2.64881e+013
+  Mass Ratio:         1.00000
+  ================================
+
+  Analysis ended Wed May 01 08:55:20 2024

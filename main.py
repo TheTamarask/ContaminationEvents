@@ -14,47 +14,6 @@ POLLUTION_AMOUNT = 2000
 MAX_THREADS = 6
 
 
-def old_analyze_chemical_pollution(iterations, water_network):
-    wn_dict = wntr.network.to_dict(water_network)
-    water_network.options.quality.parameter = 'CHEMICAL'
-
-    # Running few simulations of pollution
-    dataframe_structure = {
-        'iteration': [],
-        'Node': [],
-        'Number_of_polluted_nodes': []
-    }
-    pollution_results = pd.DataFrame(dataframe_structure)
-    i = 0
-    while i < iterations:
-        i += 1
-
-        # Select node to be polluted
-        polluted_node_index = np.random.randint(0, len(wn_dict['nodes']))
-        polluted_node = wn_dict['nodes'][polluted_node_index]
-        print(polluted_node['name'])
-        # Create a new source of pollution
-        water_network.add_source('PollutionSource', polluted_node['name'], 'SETPOINT', 1000, 'PollutionPattern')
-
-        # Simulate hydraulics
-        sim = wntr.sim.EpanetSimulator(water_network)
-        results = sim.run_sim()
-
-        # Plot results on the network
-        simulation_data = results.node['quality'].loc[HOURS_OF_SIMULATION * HOUR, :]
-        ax1 = wntr.graphics.plot_interactive_network(water_network, node_attribute=simulation_data, node_size=10,
-                                                     title='Pollution in the system')
-
-        # Extract the number of junctions that are polluted above the threshold
-        polluted_nodes = simulation_data.ge(POLLUTION_THRESHOLD)
-        number_of_polluted_nodes = sum(polluted_nodes)
-        temp_dict = {"iteration": i, "Node": polluted_node['name'],
-                     "Number_of_polluted_nodes": number_of_polluted_nodes}
-        pollution_results.loc[len(pollution_results)] = temp_dict
-    pollution_results = pollution_results.sort_values(by=['Number_of_polluted_nodes'], ascending=False)
-    print(pollution_results)
-
-
 def brute_force_single_source(water_network, start_hour_of_pollution, end_hour_of_pollution):
     # Start time measure
     start_time = perf_counter()
@@ -64,7 +23,9 @@ def brute_force_single_source(water_network, start_hour_of_pollution, end_hour_o
         'iteration': [],
         'Node': [],
         'Simulation end polluted nodes [%]': [],
-        'Max polluted nodes [%]': []
+        'Max polluted nodes [%]': [],
+        'Timestamp max polluted nodes': [],
+        'Alltime polluted nodes [%]': []
     }
     pollution_results = pd.DataFrame(dataframe_structure)
     # Running simulations of pollution for all the nodes
@@ -76,12 +37,20 @@ def brute_force_single_source(water_network, start_hour_of_pollution, end_hour_o
         dataframe_structure['Node'] = t_node_to_pollute[0]
         dataframe_structure['Simulation end polluted nodes [%]'] = analysis_results['Simulation end polluted nodes [%]']
         dataframe_structure['Max polluted nodes [%]'] = analysis_results['Max polluted nodes [%]']
+        dataframe_structure['Timestamp max polluted nodes'] = analysis_results['Timestamp max polluted nodes']
+        dataframe_structure['Alltime polluted nodes [%]'] = analysis_results['Alltime polluted nodes [%]']
 
         pollution_results.loc[len(pollution_results)] = dataframe_structure
 
     # Prepare results
+    # Alltime
     pollution_results_alltime = copy.deepcopy(pollution_results)
     pollution_results_alltime = pollution_results_alltime.sort_values(by=['Max polluted nodes [%]'], ascending=False)
+    # Max polluted
+    pollution_results_max_polluted = copy.deepcopy(pollution_results)
+    pollution_results_max_polluted = pollution_results_alltime.sort_values(by=['Max polluted nodes [%]'],
+                                                                           ascending=False)
+    # Sim end
     pollution_results = pollution_results.sort_values(by=['Simulation end polluted nodes [%]'], ascending=False)
     # Stop time measure
     end_time = perf_counter()
@@ -90,6 +59,8 @@ def brute_force_single_source(water_network, start_hour_of_pollution, end_hour_o
     return_dict = {
         'Alltime best node': pollution_results_alltime.iloc[0]['Node'],
         'Alltime best pollution [%]': pollution_results_alltime.iloc[0]['Max polluted nodes [%]'],
+        'Max polluted source node': pollution_results_max_polluted.iloc[0]['Node'],
+        'Max polluted nodes [%]': pollution_results_max_polluted.iloc[0]['Max polluted nodes [%]'],
         'Sim end best node': pollution_results.iloc[0]['Node'],
         'Sim end best pollution': pollution_results_alltime.iloc[0]['Simulation end polluted nodes [%]'],
         'Duration': duration
@@ -105,25 +76,36 @@ def brute_force_two_source(water_network, start_hour_of_pollution, end_hour_of_p
     dataframe_structure = {
         'Node': [],
         'Simulation end polluted nodes [%]': [],
-        'Max polluted nodes [%]': []
+        'Max polluted nodes [%]': [],
+        'Timestamp max polluted nodes': [],
+        'Alltime polluted nodes [%]': []
     }
     pollution_results = pd.DataFrame(dataframe_structure)
     # Running simulations of pollution for all the nodes
     for i in range(len(water_network_dict['nodes'])):
         for j in range(len(water_network_dict['nodes'])):
-            t_nodes_to_pollute = [water_network_dict['nodes'][i]['name'], water_network_dict['nodes'][j]['name']]
-            analysis_results = pollution_analysis(water_network, t_nodes_to_pollute, start_hour_of_pollution,
-                                                  end_hour_of_pollution)
-            dataframe_structure['Node'] = t_nodes_to_pollute[0] + ' ' + t_nodes_to_pollute[1]
-            dataframe_structure['Simulation end polluted nodes [%]'] = analysis_results[
-                'Simulation end polluted nodes [%]']
-            dataframe_structure['Max polluted nodes [%]'] = analysis_results['Max polluted nodes [%]']
+            if not i == j:
+                t_nodes_to_pollute = [water_network_dict['nodes'][i]['name'], water_network_dict['nodes'][j]['name']]
+                analysis_results = pollution_analysis(water_network, t_nodes_to_pollute, start_hour_of_pollution,
+                                                      end_hour_of_pollution)
+                dataframe_structure['Node'] = t_nodes_to_pollute[0] + ' ' + t_nodes_to_pollute[1]
+                dataframe_structure['Simulation end polluted nodes [%]'] = analysis_results[
+                    'Simulation end polluted nodes [%]']
+                dataframe_structure['Max polluted nodes [%]'] = analysis_results['Max polluted nodes [%]']
+                dataframe_structure['Timestamp max polluted nodes'] = analysis_results['Timestamp max polluted nodes']
+                dataframe_structure['Alltime polluted nodes [%]'] = analysis_results['Alltime polluted nodes [%]']
 
-            pollution_results.loc[len(pollution_results)] = dataframe_structure
+                pollution_results.loc[len(pollution_results)] = dataframe_structure
 
     # Prepare results
+    # Alltime
     pollution_results_alltime = copy.deepcopy(pollution_results)
     pollution_results_alltime = pollution_results_alltime.sort_values(by=['Max polluted nodes [%]'], ascending=False)
+    # Max polluted
+    pollution_results_max_polluted = copy.deepcopy(pollution_results)
+    pollution_results_max_polluted = pollution_results_alltime.sort_values(by=['Max polluted nodes [%]'],
+                                                                           ascending=False)
+    # Sim end
     pollution_results = pollution_results.sort_values(by=['Simulation end polluted nodes [%]'], ascending=False)
     # Stop time measure
     end_time = perf_counter()
@@ -132,14 +114,16 @@ def brute_force_two_source(water_network, start_hour_of_pollution, end_hour_of_p
     return_dict = {
         'Alltime best node': pollution_results_alltime.iloc[0]['Node'],
         'Alltime best pollution [%]': pollution_results_alltime.iloc[0]['Max polluted nodes [%]'],
+        'Max polluted source node': pollution_results_max_polluted.iloc[0]['Node'],
+        'Max polluted nodes [%]': pollution_results_max_polluted.iloc[0]['Max polluted nodes [%]'],
         'Sim end best node': pollution_results.iloc[0]['Node'],
-        'Sim end best pollution [%]': pollution_results_alltime.iloc[0]['Simulation end polluted nodes [%]'],
+        'Sim end best pollution': pollution_results_alltime.iloc[0]['Simulation end polluted nodes [%]'],
         'Duration': duration
     }
     return return_dict
 
 
-def pollution_analysis(water_network, nodes_to_pollute, start_hour_of_pollution, end_hour_of_pollution, i=-1, j=-1):
+def pollution_analysis(water_network, nodes_to_pollute, start_hour_of_pollution, end_hour_of_pollution):
     # Create dictionary
     wn_dict = wntr.network.to_dict(water_network)
 
@@ -200,12 +184,7 @@ def pollution_analysis(water_network, nodes_to_pollute, start_hour_of_pollution,
 
     for step in range(0, sim_steps + 1, 1):
         water_network.options.time.duration = step * (15 * MINUTE)
-        if (i == -1) and (j == -1):
-            simulation_results = sim.run_sim()
-        else:
-            file_prefix = str(i) + str(j)
-            simulation_results = sim.run_sim(file_prefix=file_prefix)
-
+        simulation_results = sim.run_sim()
         pollution_data = simulation_results.node['quality'].loc[step * (15 * MINUTE), :]
 
         # Get list of polluted nodes
@@ -305,6 +284,7 @@ def get_results_bruteforce(water_network_path, two_source=False):
     with open(filename, 'w') as results_file:
         for key, value in results_dict.items():
             results_file.write('%s:%s\n' % (key, value))
+    print('Brute force 5-7 done!')
 
     # Get the results form second window
     # Create a water network model
@@ -314,13 +294,14 @@ def get_results_bruteforce(water_network_path, two_source=False):
         results_dict = brute_force_single_source(wn, start_hour_of_pollution=13, end_hour_of_pollution=15)
         filename = "brute_force_single_results_13-15_window_" + inp_file[9:] + ".txt"
     else:
-        results_dict = brute_force_single_source(wn, start_hour_of_pollution=13, end_hour_of_pollution=15)
+        results_dict = brute_force_two_source(wn, start_hour_of_pollution=13, end_hour_of_pollution=15)
         filename = "brute_force_double_results_13-15_window_" + inp_file[9:] + ".txt"
 
     # Save to textfile
     with open(filename, 'w') as results_file:
         for key, value in results_dict.items():
             results_file.write('%s:%s\n' % (key, value))
+    print('Brute force 13-15 done!')
 
     # Get the results form third window
     # Create a water network model
@@ -330,13 +311,14 @@ def get_results_bruteforce(water_network_path, two_source=False):
         results_dict = brute_force_single_source(wn, start_hour_of_pollution=18, end_hour_of_pollution=20)
         filename = "brute_force_single_results_18-20_window_" + inp_file[9:] + ".txt"
     else:
-        results_dict = brute_force_single_source(wn, start_hour_of_pollution=18, end_hour_of_pollution=20)
+        results_dict = brute_force_two_source(wn, start_hour_of_pollution=18, end_hour_of_pollution=20)
         filename = "brute_force_double_results_18-20_window_" + inp_file[9:] + ".txt"
 
     # Save to textfile
     with open(filename, 'w') as results_file:
         for key, value in results_dict.items():
             results_file.write('%s:%s\n' % (key, value))
+    print('Brute force 18-20 done!')
 
 
 def pipe_diameter_algorithm(water_network):
@@ -399,40 +381,19 @@ def pollution_analysis_worker(wn_dict, i, j, water_n, df_structure, poll_results
 
 
 if __name__ == '__main__':
-    # get_results_bruteforce("networks/Net3.inp")
-    # get_results_bruteforce(water_network_path="networks/Net3.inp", two_source=True)
-    # get_results_bruteforce("networks/LongTermImprovement.inp")
-    get_results_bruteforce(water_network_path="networks/LongTermImprovement.inp", two_source=True)
-    # get_results_bruteforce("networks/Net3.inp")
-    # get_results_bruteforce("networks/LongTermImprovement.inp")
+    get_results_bruteforce("networks/Net1.inp")
+    print('Net1 brute force done!')
+    get_results_bruteforce("networks/Net3.inp")
+    print('Net3 brute force done!')
+    get_results_bruteforce("networks/LongTermImprovement.inp")
+    print('LTI brute force done!')
 
-    # Create a water network model and dictionary
-    # inp_file = 'networks/Net3.inp'
-    # wn = wntr.network.WaterNetworkModel(inp_file)
-    # wn_dict = wn.to_dict()
-    # Define pollution pattern
-    # pollution_pattern = wntr.network.elements.Pattern.binary_pattern('PollutionPattern',
-    #                                                                start_time=START_HOUR_OF_POLLUTION * HOUR,
-    #                                                                end_time=END_HOUR_OF_POLLUTION * HOUR,
-    #                                                                duration=wn.options.time.duration,
-    #                                                                step_size=wn.options.time.pattern_timestep)
-    # wn.add_pattern('PollutionPattern', pollution_pattern)
+    get_results_bruteforce(water_network_path="networks/Net1.inp", two_source=True)
+    print('Net1 brute force done!')
+    get_results_bruteforce(water_network_path="networks/Net3.inp", two_source=True)
+    print('Net3 brute force done!')
 
-    # nodes = {wn.node_name_list[0]}
-    # visualise_pollution(wn,nodes)
+    # get_results_bruteforce(water_network_path="networks/LongTermImprovement.inp", two_source=True)
+    # print('LTI brute force done!')
 
-    # nodes={'5'}
-    # ollution_analysis(wn, nodes)
-    # sim_steps = int(HOURS_OF_SIMULATION * HOUR / (15 * MINUTE))  # hours
 
-    # for krok in range(0, sim_steps + 1, 1):
-    # simulate_trace(wn, nodes, krok)
-    # brute_force_chemical_pollution_two_source_multithreaded(wn)
-    # print(brute_force_chemical_pollution_one_source(wn))
-    # select_nodes = ["1"]
-    # visualise_pollution(wn, select_nodes)
-    # print(brute_force_chemical_pollution_two_source(wn))
-    # print(brute_force_chemical_pollution_one_source(wn))
-    # pollution_analysis(wn, select_nodes)
-    # ax1 = wntr.graphics.plot_interactive_network(wn, node_attribute=trace['52200'], node_size=10,
-    # title='Pollution in the system')
