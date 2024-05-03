@@ -275,26 +275,22 @@ def pipe_diameter_method(water_network, start_hour_of_pollution, end_hour_of_pol
     wn_dict = water_network.to_dict()
     # Start time counter
     start_time = perf_counter()
-    # Create a list of node names
-    list_of_nodes = []
-    for i in wn_dict['nodes']:
-        list_of_nodes.append(i['name'])
+
     dataframe_structure = {
         'Node': [],
         'Number of links': []
     }
     # Create a mapping of link numbers to nodes
     node_link_map = pd.DataFrame(dataframe_structure)
-    for n in list_of_nodes:
-        list_of_links = water_network.get_links_for_node(node_name=n, flag='ALL')
+    for n in wn_dict['nodes']:
+        list_of_links = water_network.get_links_for_node(node_name=n['name'], flag='ALL')
         number_of_links = len(list_of_links)
-        dataframe_structure['Node'] = n
+        dataframe_structure['Node'] = n['name']
         dataframe_structure['Number of links'] = number_of_links
         node_link_map.loc[len(node_link_map)] = dataframe_structure
-    print(node_link_map)
     # Select top 10% of nodes to try for pollution
     selected_nodes = []
-    n = round(0.1*len(list_of_nodes))
+    n = round(0.1 * len(wn_dict['nodes']))
     if n < 2:
         n = 2
     node_link_map = node_link_map.sort_values(by=['Number of links'], ascending=False)
@@ -311,7 +307,6 @@ def pipe_diameter_method(water_network, start_hour_of_pollution, end_hour_of_pol
         'Alltime polluted nodes [%]': []
     }
     df_results = pd.DataFrame(dataframe_structure)
-    print(selected_nodes)
     if not two_source:
         for element in selected_nodes:
             analysis_results = pollution_analysis(water_network, [element], start_hour_of_pollution,
@@ -331,7 +326,127 @@ def pipe_diameter_method(water_network, start_hour_of_pollution, end_hour_of_pol
                     analysis_results = pollution_analysis(water_network, [element1, element2], start_hour_of_pollution,
                                                           end_hour_of_pollution)
                     dataframe_structure = {
-                        'Node': str(element1+', '+element2),
+                        'Node': str(element1 + ', ' + element2),
+                        'Simulation end polluted nodes [%]': analysis_results['Simulation end polluted nodes [%]'],
+                        'Max polluted nodes [%]': analysis_results['Max polluted nodes [%]'],
+                        'Timestamp max polluted nodes': analysis_results['Timestamp max polluted nodes'],
+                        'Alltime polluted nodes [%]': analysis_results['Alltime polluted nodes [%]']
+                    }
+                    df_results.loc[len(df_results)] = dataframe_structure
+
+    # Prepare results
+    return_dict = {
+        'Alltime best node': [],
+        'Alltime best pollution [%]': [],
+        'Max polluted source node': [],
+        'Max polluted nodes [%]': [],
+        'Sim end best node': [],
+        'Sim end best pollution': [],
+        'Duration': []
+    }
+    # Alltime
+    df_results = df_results.sort_values(by=['Alltime polluted nodes [%]'], ascending=False)
+    return_dict['Alltime best node'] = df_results.iloc[0]['Node']
+    return_dict['Alltime best pollution [%]'] = df_results.iloc[0]['Alltime polluted nodes [%]']
+    # Max polluted
+    df_results = df_results.sort_values(by=['Max polluted nodes [%]'], ascending=False)
+    return_dict['Max polluted source node'] = df_results.iloc[0]['Node'],
+    return_dict['Max polluted nodes [%]'] = df_results.iloc[0]['Max polluted nodes [%]'],
+    # Sim end
+    df_results = df_results.sort_values(by=['Simulation end polluted nodes [%]'], ascending=False)
+    return_dict['Sim end best node'] = df_results.iloc[0]['Node']
+    return_dict['Sim end best pollution'] = df_results.iloc[0]['Simulation end polluted nodes [%]']
+    # Stop time measure
+    end_time = perf_counter()
+    duration = end_time - start_time
+    return_dict['Duration'] = duration
+
+    return return_dict
+
+
+def select_flowrate(dict_tuple):
+    return dict_tuple[1]['Flowrate']
+
+
+def max_outflow_method(water_network, start_hour_of_pollution, end_hour_of_pollution, two_source=False):
+    # Create Water Network dictionary
+    wn_dict = water_network.to_dict()
+    # Start time counter
+    start_time = perf_counter()
+    # Create a list of node names
+
+    # Create a mapping of output links to nodes
+    node_link_map = {}
+    for n in wn_dict['nodes']:
+        list_of_links = water_network.get_links_for_node(node_name=n['name'], flag='OUTLET')
+        dictionary_row = {
+            'Node': n['name'],
+            'Links': list_of_links,
+            "Number of links": len(list_of_links),
+            'Flowrate': 0.0
+        }
+        node_link_map[n['name']] = dictionary_row
+
+    # Get flowrates for simulation period
+
+    # Define timesteps of the simulation for Flowrates ...
+    water_network.options.time.start_clocktime = 0
+    water_network.options.time.duration = start_hour_of_pollution * HOUR + HOURS_OF_SIMULATION * HOUR
+    water_network.options.time.pattern_timestep = HOUR
+    water_network.options.time.hydraulic_timestep = 15 * MINUTE
+    water_network.options.time.quality_timestep = 15 * MINUTE
+    water_network.options.time.report_timestep = 15 * MINUTE
+    sim = wntr.sim.EpanetSimulator(water_network)
+    results = sim.run_sim()
+
+    for element in node_link_map.items():
+        summed_flowrates = 0.0
+        for link in element[1]['Links']:
+            series_flowrates = results.link['flowrate']
+            series_flowrates = series_flowrates.loc[:, link]
+            series_flowrates = abs(series_flowrates)
+            summed_flowrates += sum(series_flowrates)
+        element[1]['Flowrate'] = summed_flowrates
+
+    # Select top 10% of nodes to try for pollution
+    selected_nodes = []
+    n = round(0.1 * len(wn_dict['nodes']))
+    if n < 2:
+        n = 2
+    # Sort by flowrate descending
+    node_link_map = sorted(node_link_map.items(), key=select_flowrate, reverse=True)
+    for i in range(n):
+        selected_nodes.append(node_link_map[i][0])
+
+    # Generate results for select nodes
+    dataframe_structure = {
+        'Node': [],
+        'Simulation end polluted nodes [%]': [],
+        'Max polluted nodes [%]': [],
+        'Timestamp max polluted nodes': [],
+        'Alltime polluted nodes [%]': []
+    }
+    df_results = pd.DataFrame(dataframe_structure)
+    if not two_source:
+        for element in selected_nodes:
+            analysis_results = pollution_analysis(water_network, [element], start_hour_of_pollution,
+                                                  end_hour_of_pollution)
+            dataframe_structure = {
+                'Node': element,
+                'Simulation end polluted nodes [%]': analysis_results['Simulation end polluted nodes [%]'],
+                'Max polluted nodes [%]': analysis_results['Max polluted nodes [%]'],
+                'Timestamp max polluted nodes': analysis_results['Timestamp max polluted nodes'],
+                'Alltime polluted nodes [%]': analysis_results['Alltime polluted nodes [%]']
+            }
+            df_results.loc[len(df_results)] = dataframe_structure
+    else:
+        for element1 in selected_nodes:
+            for element2 in selected_nodes:
+                if not element1 == element2:
+                    analysis_results = pollution_analysis(water_network, [element1, element2], start_hour_of_pollution,
+                                                          end_hour_of_pollution)
+                    dataframe_structure = {
+                        'Node': str(element1 + ', ' + element2),
                         'Simulation end polluted nodes [%]': analysis_results['Simulation end polluted nodes [%]'],
                         'Max polluted nodes [%]': analysis_results['Max polluted nodes [%]'],
                         'Timestamp max polluted nodes': analysis_results['Timestamp max polluted nodes'],
@@ -429,10 +544,10 @@ def get_results_pipe_diameter(water_network_path, two_source=False):
     # Get the results form first window
     if not two_source:
         results_dict = pipe_diameter_method(wn, start_hour_of_pollution=5, end_hour_of_pollution=7, two_source=False)
-        filename = "brute_force_single_results_5-7_window_" + inp_file[9:] + ".txt"
+        filename = "pipe_diameter_single_results_5-7_window_" + inp_file[9:] + ".txt"
     else:
         results_dict = pipe_diameter_method(wn, start_hour_of_pollution=5, end_hour_of_pollution=7, two_source=True)
-        filename = "brute_force_double_results_5-7_window_" + inp_file[9:] + ".txt"
+        filename = "pipe_diameter_double_results_5-7_window_" + inp_file[9:] + ".txt"
 
     # Save to textfile
     with open(filename, 'w') as results_file:
@@ -446,10 +561,10 @@ def get_results_pipe_diameter(water_network_path, two_source=False):
     wn = wntr.network.WaterNetworkModel(inp_file)
     if not two_source:
         results_dict = pipe_diameter_method(wn, start_hour_of_pollution=13, end_hour_of_pollution=15, two_source=False)
-        filename = "brute_force_single_results_13-15_window_" + inp_file[9:] + ".txt"
+        filename = "pipe_diameter_single_results_13-15_window_" + inp_file[9:] + ".txt"
     else:
         results_dict = pipe_diameter_method(wn, start_hour_of_pollution=13, end_hour_of_pollution=15, two_source=True)
-        filename = "brute_force_double_results_13-15_window_" + inp_file[9:] + ".txt"
+        filename = "pipe_diameter_double_results_13-15_window_" + inp_file[9:] + ".txt"
 
     # Save to textfile
     with open(filename, 'w') as results_file:
@@ -463,16 +578,69 @@ def get_results_pipe_diameter(water_network_path, two_source=False):
     wn = wntr.network.WaterNetworkModel(inp_file)
     if not two_source:
         results_dict = pipe_diameter_method(wn, start_hour_of_pollution=18, end_hour_of_pollution=20, two_source=False)
-        filename = "brute_force_single_results_18-20_window_" + inp_file[9:] + ".txt"
+        filename = "pipe_diameter_single_results_18-20_window_" + inp_file[9:] + ".txt"
     else:
         results_dict = pipe_diameter_method(wn, start_hour_of_pollution=18, end_hour_of_pollution=20, two_source=True)
-        filename = "brute_force_double_results_18-20_window_" + inp_file[9:] + ".txt"
+        filename = "pipe_diameter_double_results_18-20_window_" + inp_file[9:] + ".txt"
 
     # Save to textfile
     with open(filename, 'w') as results_file:
         for key, value in results_dict.items():
             results_file.write('%s:%s\n' % (key, value))
-    print('Pipe diametere 18-20 done!')
+    print('Pipe diameter 18-20 done!')
+
+
+def get_results_mean_outflow(water_network_path, two_source=False):
+    # Create a water network model
+    inp_file = water_network_path
+    wn = wntr.network.WaterNetworkModel(inp_file)
+    # Get the results form first window
+    if not two_source:
+        results_dict = max_outflow_method(wn, start_hour_of_pollution=5, end_hour_of_pollution=7, two_source=False)
+        filename = "max_outflow_method_single_results_5-7_window_" + inp_file[9:] + ".txt"
+    else:
+        results_dict = max_outflow_method(wn, start_hour_of_pollution=5, end_hour_of_pollution=7, two_source=True)
+        filename = "max_outflow_method_double_results_5-7_window_" + inp_file[9:] + ".txt"
+
+    # Save to textfile
+    with open(filename, 'w') as results_file:
+        for key, value in results_dict.items():
+            results_file.write('%s:%s\n' % (key, value))
+    print('Max outflow 5-7 done!')
+
+    # Get the results form second window
+    # Create a water network model
+    inp_file = water_network_path
+    wn = wntr.network.WaterNetworkModel(inp_file)
+    if not two_source:
+        results_dict = max_outflow_method(wn, start_hour_of_pollution=13, end_hour_of_pollution=15, two_source=False)
+        filename = "max_outflow_single_results_13-15_window_" + inp_file[9:] + ".txt"
+    else:
+        results_dict = max_outflow_method(wn, start_hour_of_pollution=13, end_hour_of_pollution=15, two_source=True)
+        filename = "max_outflow_double_results_13-15_window_" + inp_file[9:] + ".txt"
+
+    # Save to textfile
+    with open(filename, 'w') as results_file:
+        for key, value in results_dict.items():
+            results_file.write('%s:%s\n' % (key, value))
+    print('Max outflow 13-15 done!')
+
+    # Get the results form third window
+    # Create a water network model
+    inp_file = water_network_path
+    wn = wntr.network.WaterNetworkModel(inp_file)
+    if not two_source:
+        results_dict = max_outflow_method(wn, start_hour_of_pollution=18, end_hour_of_pollution=20, two_source=False)
+        filename = "max_outflow_single_results_18-20_window_" + inp_file[9:] + ".txt"
+    else:
+        results_dict = max_outflow_method(wn, start_hour_of_pollution=18, end_hour_of_pollution=20, two_source=True)
+        filename = "max_outflow_double_results_18-20_window_" + inp_file[9:] + ".txt"
+
+    # Save to textfile
+    with open(filename, 'w') as results_file:
+        for key, value in results_dict.items():
+            results_file.write('%s:%s\n' % (key, value))
+    print('Max outflow 18-20 done!')
 
 
 # TODO popraw wielowątkowość - nie odpalają się kolejne wątki
@@ -531,15 +699,18 @@ def pollution_analysis_worker(wn_dict, i, j, water_n, df_structure, poll_results
 
 
 if __name__ == '__main__':
-
+    # Create a water network model
+    inp_file = "networks/Net1.inp"
+    wn = wntr.network.WaterNetworkModel(inp_file)
+    max_outflow_method(wn, 5, 7)
     # Pipe diameter
-    get_results_pipe_diameter("networks/Net1.inp")
-    get_results_pipe_diameter("networks/Net1.inp", two_source=True)
-    print('Net1 pipe diameter done!')
-    get_results_pipe_diameter("networks/Net3.inp")
-    get_results_pipe_diameter("networks/Net3.inp", two_source=True)
-    print('Net3 pipe diameter done!')
-    get_results_pipe_diameter("networks/LongTermImprovement.inp")
+    # get_results_pipe_diameter("networks/Net1.inp")
+    # get_results_pipe_diameter("networks/Net1.inp", two_source=True)
+    # print('Net1 pipe diameter done!')
+    # get_results_pipe_diameter("networks/Net3.inp")
+    # get_results_pipe_diameter("networks/Net3.inp", two_source=True)
+    # print('Net3 pipe diameter done!')
+    # get_results_pipe_diameter("networks/LongTermImprovement.inp")
     get_results_pipe_diameter("networks/LongTermImprovement.inp", two_source=True)
     print('Long Term Improvement pipe diameter done!')
 
