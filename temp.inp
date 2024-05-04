@@ -1,6 +1,6 @@
 ; Filename: networks/Net1.inp
 ; WNTR: 1.0.0
-; Created: 2024-05-03 16:00:14
+; Created: 2024-05-04 19:59:20
 [TITLE]
 EPANET Example Network 1
 A simple example of modeling chlorine decay. Both bulk and
