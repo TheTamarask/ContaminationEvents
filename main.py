@@ -3,6 +3,7 @@ from time import perf_counter
 import numpy as np
 import wntr
 import pandas as pd
+import statistics
 import pygad
 
 # Constants
@@ -645,39 +646,56 @@ def combined_method(water_network_path, start_hour_of_pollution, end_hour_of_pol
 
 
 # objective function
-def genetic_algorithm_objective(pop, water_network_path, start_hour_of_pollution, end_hour_of_pollution, mode='global', two_source=False):
+def genetic_algorithm_objective(pop, water_network_path, start_hour_of_pollution, end_hour_of_pollution, mode='global',
+                                two_source=False):
     # Create a water network model
     wn = wntr.network.WaterNetworkModel(water_network_path)
     wn_dict = wn.to_dict()
     # Generate results for the selected populations, use lower resolution - timestep = 1 hour
     # Store results in a list
     results = []
-    for node in range(len(pop)):
-        if pop[node]:
-            nodes_to_pollute = [wn_dict['nodes'][node]['name']]
-            result = pollution_analysis(wn, nodes_to_pollute, start_hour_of_pollution=start_hour_of_pollution, end_hour_of_pollution=end_hour_of_pollution, timestep=HOUR)
-            results.append(result)
-    if mode == 'max':
-        max_sum = 0
-        for result in results:
-            max_sum += result['Max polluted nodes [%]']
-        mean = max_sum/sum(pop)
-        return mean
-    elif mode == 'sim_end':
-        sim_end_sum = 0
-        for result in results:
-            sim_end_sum += result['Simulation end polluted nodes [%]']
-        mean = sim_end_sum/sum(pop)
-        return mean
+    if not two_source:
+        for node in range(len(pop)):
+            if pop[node]:
+                nodes_to_pollute = [wn_dict['nodes'][node]['name']]
+                result = pollution_analysis(wn, nodes_to_pollute, start_hour_of_pollution=start_hour_of_pollution,
+                                            end_hour_of_pollution=end_hour_of_pollution, timestep=HOUR)
+                results.append(result)
     else:
-        global_sum = 0
+        nodes_to_pollute = []
+        for node in range(len(pop)):
+            if pop[node]:
+                nodes_to_pollute.append(wn_dict['nodes'][node]['name'])
+            if len(nodes_to_pollute) == 2:
+                result = pollution_analysis(wn, nodes_to_pollute, start_hour_of_pollution=start_hour_of_pollution,
+                                            end_hour_of_pollution=end_hour_of_pollution, timestep=HOUR)
+                nodes_to_pollute = []
+                results.append(result)
+    if len(results) == 0:
+        empty_result = {
+            'Simulation end polluted nodes [%]': 0,
+            'Max polluted nodes [%]': 0,
+            'Alltime polluted nodes [%]': 0,
+        }
+        results.append(empty_result)
+    if mode == 'max':
+        temp_results = []
         for result in results:
-            global_sum += result['Alltime polluted nodes [%]']
-        mean = global_sum / sum(pop)
-        return mean
+            temp_results.append(result['Max polluted nodes [%]'])
+        return statistics.median(temp_results)
+    elif mode == 'sim_end':
+        temp_results = []
+        for result in results:
+            temp_results.append(result['Simulation end polluted nodes [%]'])
+        return statistics.median(temp_results)
+    else:
+        temp_results = []
+        for result in results:
+            temp_results.append(result['Alltime polluted nodes [%]'])
+        return statistics.median(temp_results)
 
 
-# tournament selection
+# Selection function for genetic algorithm - tournament selection used
 def selection(pop, scores, k=3):
     # first random selection
     selection_ix = np.random.randint(len(pop))
@@ -688,7 +706,7 @@ def selection(pop, scores, k=3):
     return pop[selection_ix]
 
 
-# crossover two parents to create two children
+# Crossover function for genetic algorithm -  two parents create two children
 def crossover(p1, p2, r_cross):
     # children are copies of parents by default
     c1, c2 = p1.copy(), p2.copy()
@@ -702,7 +720,7 @@ def crossover(p1, p2, r_cross):
     return [c1, c2]
 
 
-# mutation operator
+# Mutation function for genetic algorithm
 def mutation(bitstring, r_mut):
     for i in range(len(bitstring)):
         # check for a mutation
@@ -711,8 +729,9 @@ def mutation(bitstring, r_mut):
             bitstring[i] = 1 - bitstring[i]
 
 
-# genetic algorithm
-def genetic_algorithm(objective, n_nodes, n_iter, n_pop, r_cross, r_mut, n_nodes_in_pop, water_network_path, start_hour_of_pollution, end_hour_of_pollution, mode="global", two_source=False):
+# Genetic algorithm function
+def genetic_algorithm(objective, n_nodes, n_iter, n_pop, r_cross, r_mut, n_nodes_in_pop, water_network_path,
+                      start_hour_of_pollution, end_hour_of_pollution, mode="global", two_source=False):
     # initial population of random bitstring
     pop = []
     for pop_number in range(1,n_pop+1):
@@ -727,11 +746,13 @@ def genetic_algorithm(objective, n_nodes, n_iter, n_pop, r_cross, r_mut, n_nodes
         pop.append(temp_pop)
 
     # keep track of best solution
-    best, best_eval = pop[0], objective(pop[0], water_network_path, start_hour_of_pollution, end_hour_of_pollution)
+    best, best_eval = pop[0], objective(pop[0], water_network_path, start_hour_of_pollution, end_hour_of_pollution,
+                                        mode, two_source)
     # enumerate generations
     for gen in range(n_iter):
         # evaluate all candidates in the population
-        scores = [objective(c, water_network_path, start_hour_of_pollution, end_hour_of_pollution, mode) for c in pop]
+        scores = [objective(c, water_network_path, start_hour_of_pollution, end_hour_of_pollution, mode, two_source)
+                  for c in pop]
         # check for new best solution
         for i in range(n_pop):
             if scores[i] > best_eval:
@@ -758,75 +779,27 @@ def genetic_algorithm(objective, n_nodes, n_iter, n_pop, r_cross, r_mut, n_nodes
         n_pop = len(pop)
     return [best, best_eval]
 
-def genetic_algorithm_method(water_network_path, start_hour_of_pollution, end_hour_of_pollution, n_nodes_in_pop, r_cross, r_mut, two_source=False):
-    water_network = wntr.network.WaterNetworkModel(water_network_path)
-    wn_dict = water_network.to_dict()
-    n_nodes = len(wn_dict['nodes'])
-    n_pop = round(n_nodes / n_nodes_in_pop)
-    genetic_algorithm(genetic_algorithm_objective, n_nodes=n_nodes, n_iter=100, n_pop=n_pop, r_cross=r_cross,
-                      r_mut=r_mut, n_nodes_in_pop=n_nodes_in_pop, water_network_path="networks/Net1.inp",
-                      start_hour_of_pollution=5,
-                      end_hour_of_pollution=7, mode='global')
 
-
-
-
-    # Create Water Network dictionary
-    wn_dict = water_network.to_dict()
+def genetic_algorithm_method(water_network_path, start_hour_of_pollution, end_hour_of_pollution, n_iter, n_nodes_in_pop,
+                             r_cross, r_mut, two_source=False):
     # Start time counter
     start_time = perf_counter()
-
-    # Create a mapping of output links to nodes
-    node_link_map = {}
-    for n in wn_dict['nodes']:
-        list_of_links = water_network.get_links_for_node(node_name=n['name'], flag='OUTLET')
-        dictionary_row = {
-            'Node': n['name'],
-            'Links': list_of_links,
-            "Number of links": len(list_of_links),
-            'Flowrate': 0.0
-        }
-        node_link_map[n['name']] = dictionary_row
-
-    # Get flowrates for simulation period
-
-    # Define timesteps of the simulation for Flowrates ...
-    water_network.options.time.start_clocktime = 0
-    water_network.options.time.duration = start_hour_of_pollution * HOUR + HOURS_OF_SIMULATION * HOUR
-    water_network.options.time.pattern_timestep = HOUR
-    water_network.options.time.hydraulic_timestep = 15 * MINUTE
-    water_network.options.time.quality_timestep = 15 * MINUTE
-    water_network.options.time.report_timestep = 15 * MINUTE
-    sim = wntr.sim.EpanetSimulator(water_network)
-    results = sim.run_sim()
-
-    for element in node_link_map.items():
-        summed_flowrates = 0.0
-        for link in element[1]['Links']:
-            series_flowrates = results.link['flowrate']
-            series_flowrates = series_flowrates.loc[:, link]
-            series_flowrates = abs(series_flowrates)
-            summed_flowrates += sum(series_flowrates)
-        element[1]['Flowrate'] = summed_flowrates
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    # Create water network
+    water_network = wntr.network.WaterNetworkModel(water_network_path)
+    wn_dict = water_network.to_dict()
+    # Prepare and run the algorithm
+    n_nodes = len(wn_dict['nodes'])
+    n_pop = round(n_nodes / n_nodes_in_pop)
+    [best_nodes, best_eval] = genetic_algorithm(genetic_algorithm_objective, n_nodes=n_nodes, n_iter=n_iter, n_pop=n_pop,
+                                          r_cross=r_cross, r_mut=r_mut, n_nodes_in_pop=n_nodes_in_pop,
+                                          water_network_path="networks/Net1.inp", start_hour_of_pollution=5,
+                                          end_hour_of_pollution=7, mode='global', two_source=two_source)
+    # Prepare selected nodes
+    selected_nodes = []
+    for node_nr in range(len(wn_dict['nodes'])):
+        if best_nodes[node_nr]:
+            temp = wn_dict['nodes'][node_nr]['name']
+            selected_nodes.append(temp)
     # Generate results for select nodes
     dataframe_structure = {
         'Node': [],
@@ -1032,10 +1005,12 @@ def get_results_combined(water_network_path, two_source=False):
 
     # Get the results form first window
     if not two_source:
-        results_dict = combined_method(water_network_path, start_hour_of_pollution=5, end_hour_of_pollution=7, two_source=False)
+        results_dict = combined_method(water_network_path, start_hour_of_pollution=5, end_hour_of_pollution=7,
+                                       two_source=False)
         filename = "results/max_outflow_method_single_results_5-7_window_" + water_network_path[9:] + ".txt"
     else:
-        results_dict = combined_method(water_network_path, start_hour_of_pollution=5, end_hour_of_pollution=7, two_source=True)
+        results_dict = combined_method(water_network_path, start_hour_of_pollution=5, end_hour_of_pollution=7,
+                                       two_source=True)
         filename = "results/combined_method_double_results_5-7_window_" + water_network_path[9:] + ".txt"
 
     # Save to textfile
@@ -1046,10 +1021,12 @@ def get_results_combined(water_network_path, two_source=False):
 
     # Get the results form second window
     if not two_source:
-        results_dict = combined_method(water_network_path, start_hour_of_pollution=13, end_hour_of_pollution=15, two_source=False)
+        results_dict = combined_method(water_network_path, start_hour_of_pollution=13, end_hour_of_pollution=15,
+                                       two_source=False)
         filename = "results/combined_method_single_results_13-15_window_" + water_network_path[9:] + ".txt"
     else:
-        results_dict = combined_method(water_network_path, start_hour_of_pollution=13, end_hour_of_pollution=15, two_source=True)
+        results_dict = combined_method(water_network_path, start_hour_of_pollution=13, end_hour_of_pollution=15,
+                                       two_source=True)
         filename = "results/combined_method_double_results_13-15_window_" + water_network_path[9:] + ".txt"
 
     # Save to textfile
@@ -1060,10 +1037,12 @@ def get_results_combined(water_network_path, two_source=False):
 
     # Get the results form third window
     if not two_source:
-        results_dict = combined_method(water_network_path, start_hour_of_pollution=18, end_hour_of_pollution=20, two_source=False)
+        results_dict = combined_method(water_network_path, start_hour_of_pollution=18, end_hour_of_pollution=20,
+                                       two_source=False)
         filename = "results/combined_method_single_results_18-20_window_" + water_network_path[9:] + ".txt"
     else:
-        results_dict = combined_method(water_network_path, start_hour_of_pollution=18, end_hour_of_pollution=20, two_source=True)
+        results_dict = combined_method(water_network_path, start_hour_of_pollution=18, end_hour_of_pollution=20,
+                                       two_source=True)
         filename = "results/combined_method_double_results_18-20_window_" + water_network_path[9:] + ".txt"
 
     # Save to textfile
@@ -1073,9 +1052,64 @@ def get_results_combined(water_network_path, two_source=False):
     print('Combined 18-20 done!')
 
 
-if __name__ == '__main__':
+def get_results_genetic(water_network_path, n_iter, n_nodes_in_pop, r_cross, r_mut, two_source=False):
 
-    results_dict = genetic_algorithm_method(water_network_path="networks/Net1.inp", start_hour_of_pollution=5, end_hour_of_pollution=7, n_nodes_in_pop=4, r_cross=0.9, r_mut=0.1)
+    # Get the results form first window
+    if not two_source:
+        results_dict = genetic_algorithm_method(water_network_path, start_hour_of_pollution=5, end_hour_of_pollution=7,
+                                                n_iter=n_iter, n_nodes_in_pop=n_nodes_in_pop, r_cross=r_cross,
+                                                r_mut=r_mut, two_source=False)
+        filename = "results/genetic_algorithm_method_single_results_5-7_window_" + water_network_path[9:] + ".txt"
+    else:
+        results_dict = genetic_algorithm_method(water_network_path, start_hour_of_pollution=5, end_hour_of_pollution=7,
+                                                n_iter=n_iter, n_nodes_in_pop=n_nodes_in_pop, r_cross=r_cross,
+                                                r_mut=r_mut, two_source=True)
+        filename = "results/genetic_algorithm_method_double_results_5-7_window_" + water_network_path[9:] + ".txt"
+
+    # Save to textfile
+    with open(filename, 'w') as results_file:
+        for key, value in results_dict.items():
+            results_file.write('%s:%s\n' % (key, value))
+    print('Genetic algorithm 5-7 done!')
+
+    # Get the results form second window
+    if not two_source:
+        results_dict = genetic_algorithm_method(water_network_path, start_hour_of_pollution=13, end_hour_of_pollution=15,
+                                                n_iter=n_iter, n_nodes_in_pop=n_nodes_in_pop, r_cross=r_cross,
+                                                r_mut=r_mut, two_source=False)
+        filename = "results/genetic_algorithm_method_single_results_13-15_window_" + water_network_path[9:] + ".txt"
+    else:
+        results_dict = genetic_algorithm_method(water_network_path, start_hour_of_pollution=13, end_hour_of_pollution=15,
+                                                n_iter=n_iter, n_nodes_in_pop=n_nodes_in_pop, r_cross=r_cross,
+                                                r_mut=r_mut, two_source=True)
+        filename = "results/genetic_algorithm_method_double_results_13-15_window_" + water_network_path[9:] + ".txt"
+
+    # Save to textfile
+    with open(filename, 'w') as results_file:
+        for key, value in results_dict.items():
+            results_file.write('%s:%s\n' % (key, value))
+    print('Genetic algorithm 13-15 done!')
+
+    # Get the results form third window
+    if not two_source:
+        results_dict = genetic_algorithm_method(water_network_path, start_hour_of_pollution=18, end_hour_of_pollution=20,
+                                                n_iter=n_iter, n_nodes_in_pop=n_nodes_in_pop, r_cross=r_cross,
+                                                r_mut=r_mut, two_source=False)
+        filename = "results/genetic_algorithm_method_single_results_18-20_window_" + water_network_path[9:] + ".txt"
+    else:
+        results_dict = genetic_algorithm_method(water_network_path, start_hour_of_pollution=18, end_hour_of_pollution=20,
+                                                n_iter=n_iter, n_nodes_in_pop=n_nodes_in_pop, r_cross=r_cross,
+                                                r_mut=r_mut, two_source=True)
+        filename = "results/genetic_algorithm_method_double_results_18-20_window_" + water_network_path[9:] + ".txt"
+
+    # Save to textfile
+    with open(filename, 'w') as results_file:
+        for key, value in results_dict.items():
+            results_file.write('%s:%s\n' % (key, value))
+    print('Genetic algorithm 18-20 done!')
+
+
+if __name__ == '__main__':
     # Pipe diameter
     get_results_pipe_diameter("networks/Net1.inp")
     get_results_pipe_diameter("networks/Net1.inp", two_source=True)
@@ -1108,6 +1142,20 @@ if __name__ == '__main__':
     get_results_combined("networks/LongTermImprovement.inp")
     get_results_combined("networks/LongTermImprovement.inp", two_source=True)
     print('Long Term Improvement combined done!')
+
+    # Genetic
+    get_results_genetic("networks/Net1.inp", n_iter=10, n_nodes_in_pop=4, r_cross=0.9, r_mut=0.1)
+    get_results_genetic("networks/Net1.inp", n_iter=10, n_nodes_in_pop=4, r_cross=0.9, r_mut=0.1,
+                        two_source=True)
+    print('Net1 genetic done!')
+    get_results_genetic("networks/Net3.inp", n_iter=10, n_nodes_in_pop=4, r_cross=0.9, r_mut=0.1)
+    get_results_genetic("networks/Net3.inp", n_iter=10, n_nodes_in_pop=4, r_cross=0.9, r_mut=0.1,
+                        two_source=True)
+    print('Net3 genetic done!')
+    get_results_genetic("networks/LongTermImprovement.inp", n_iter=10, n_nodes_in_pop=4, r_cross=0.9, r_mut=0.1)
+    get_results_genetic("networks/LongTermImprovement.inp", n_iter=10, n_nodes_in_pop=4, r_cross=0.9, r_mut=0.1,
+                        two_source=True)
+    print('Long Term Improvement genetic done!')
 
     # Single source brute force
     get_results_bruteforce("networks/Net1.inp")
