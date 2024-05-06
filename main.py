@@ -1122,7 +1122,6 @@ def get_results_genetic(water_network_path, n_iter, n_nodes_in_pop, r_cross, r_m
 
 
 if __name__ == '__main__':
-    get_results_pipe_diameter("networks/Net1.inp", two_source=True)
     # Pipe diameter
     get_results_pipe_diameter("networks/Net1.inp")
     get_results_pipe_diameter("networks/Net1.inp", two_source=True)
