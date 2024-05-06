@@ -1,6 +1,6 @@
 ; Filename: networks/Net1.inp
 ; WNTR: 1.0.0
-; Created: 2024-05-05 21:25:51
+; Created: 2024-05-06 18:33:21
 [TITLE]
 EPANET Example Network 1
 A simple example of modeling chlorine decay. Both bulk and
@@ -106,8 +106,6 @@ DEMAND CHARGE          0.0000
 ;Node      Type       Quality    Pattern   
 10         SETPOINT   2000000.0  PollutionPattern
 11         SETPOINT   2000000.0  PollutionPattern
-12         SETPOINT   2000000.0  PollutionPattern
-13         SETPOINT   2000000.0  PollutionPattern
 
 [REACTIONS]
 ;Type           Pipe/Tank               Coefficient

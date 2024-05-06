@@ -161,12 +161,7 @@ def pollution_analysis(water_network, nodes_to_pollute, start_hour_of_pollution,
 
     # Poison select nodes in CHEMICAL sim network
     for element in nodes_to_pollute:
-        polluted_node = None
-        for node in wn_dict['nodes']:
-            if node['name'] == element:
-                polluted_node = node
-                break
-        water_network.add_source('PollutionSource_' + polluted_node['name'], polluted_node['name'], 'SETPOINT',
+        water_network.add_source('PollutionSource_' + element, element, 'SETPOINT',
                                  POLLUTION_AMOUNT, 'PollutionPattern')
     water_network.options.quality.parameter = 'CHEMICAL'
 
@@ -295,7 +290,8 @@ def pipe_diameter_method(water_network_path, start_hour_of_pollution, end_hour_o
     diameters = sorted(list(set(diameters)), reverse=True)
 
     # Get links with 2 biggest diameters
-    series_big_links = water_network.query_link_attribute(attribute='diameter', operation=np.greater, value=diameters[2])
+    series_big_links = water_network.query_link_attribute(attribute='diameter', operation=np.greater,
+                                                          value=diameters[2])
     # Get starting nodes of big links
     selected_nodes = []
     for link_name in series_big_links.index:
@@ -734,11 +730,11 @@ def genetic_algorithm(objective, n_nodes, n_iter, n_pop, r_cross, r_mut, n_nodes
                       start_hour_of_pollution, end_hour_of_pollution, mode="global", two_source=False):
     # initial population of random bitstring
     pop = []
-    for pop_number in range(1,n_pop+1):
+    for pop_number in range(1, n_pop + 1):
         temp_pop = []
         for node_number in range(n_nodes):
-            lower_bound=pop_number*n_nodes_in_pop-n_nodes_in_pop
-            upper_bound=pop_number*n_nodes_in_pop
+            lower_bound = pop_number * n_nodes_in_pop - n_nodes_in_pop
+            upper_bound = pop_number * n_nodes_in_pop
             if lower_bound <= node_number < upper_bound:
                 temp_pop.append(1)
             else:
@@ -757,17 +753,17 @@ def genetic_algorithm(objective, n_nodes, n_iter, n_pop, r_cross, r_mut, n_nodes
         for i in range(n_pop):
             if scores[i] > best_eval:
                 best, best_eval = pop[i], scores[i]
-                print(">%d, new best f(%s) = %.3f" % (gen,  pop[i], scores[i]))
+                print(">%d, new best f(%s) = %.3f" % (gen, pop[i], scores[i]))
         # select parents
         selected = [selection(pop, scores) for _ in range(n_pop)]
         # create the next generation
         children = list()
         for i in range(0, n_pop, 2):
             # get selected parents in pairs
-            if i+2 <= n_pop:
-                p1, p2 = selected[i], selected[i+1]
+            if i + 2 <= n_pop:
+                p1, p2 = selected[i], selected[i + 1]
             else:
-                p1, p2 = selected[i-1], selected[i]
+                p1, p2 = selected[i - 1], selected[i]
             # crossover and mutation
             for c in crossover(p1, p2, r_cross):
                 # mutation
@@ -790,10 +786,11 @@ def genetic_algorithm_method(water_network_path, start_hour_of_pollution, end_ho
     # Prepare and run the algorithm
     n_nodes = len(wn_dict['nodes'])
     n_pop = round(n_nodes / n_nodes_in_pop)
-    [best_nodes, best_eval] = genetic_algorithm(genetic_algorithm_objective, n_nodes=n_nodes, n_iter=n_iter, n_pop=n_pop,
-                                          r_cross=r_cross, r_mut=r_mut, n_nodes_in_pop=n_nodes_in_pop,
-                                          water_network_path="networks/Net1.inp", start_hour_of_pollution=5,
-                                          end_hour_of_pollution=7, mode='global', two_source=two_source)
+    [best_nodes, best_eval] = genetic_algorithm(genetic_algorithm_objective, n_nodes=n_nodes, n_iter=n_iter,
+                                                n_pop=n_pop,
+                                                r_cross=r_cross, r_mut=r_mut, n_nodes_in_pop=n_nodes_in_pop,
+                                                water_network_path="networks/Net1.inp", start_hour_of_pollution=5,
+                                                end_hour_of_pollution=7, mode='global', two_source=two_source)
     # Prepare selected nodes
     selected_nodes = []
     for node_nr in range(len(wn_dict['nodes'])):
@@ -867,7 +864,7 @@ def genetic_algorithm_method(water_network_path, start_hour_of_pollution, end_ho
 
 
 def get_results_bruteforce(water_network_path, two_source=False):
-       # Get the results form first window
+    # Get the results form first window
     if not two_source:
         results_dict = brute_force_single_source(water_network_path, start_hour_of_pollution=5, end_hour_of_pollution=7)
         filename = "results/brute_force_single_results_5-7_window_" + water_network_path[9:] + ".txt"
@@ -883,7 +880,8 @@ def get_results_bruteforce(water_network_path, two_source=False):
 
     # Get the results form second window
     if not two_source:
-        results_dict = brute_force_single_source(water_network_path, start_hour_of_pollution=13, end_hour_of_pollution=15)
+        results_dict = brute_force_single_source(water_network_path, start_hour_of_pollution=13,
+                                                 end_hour_of_pollution=15)
         filename = "results/brute_force_single_results_13-15_window_" + water_network_path[9:] + ".txt"
     else:
         results_dict = brute_force_two_source(water_network_path, start_hour_of_pollution=13, end_hour_of_pollution=15)
@@ -897,7 +895,8 @@ def get_results_bruteforce(water_network_path, two_source=False):
 
     # Get the results form third window
     if not two_source:
-        results_dict = brute_force_single_source(water_network_path, start_hour_of_pollution=18, end_hour_of_pollution=20)
+        results_dict = brute_force_single_source(water_network_path, start_hour_of_pollution=18,
+                                                 end_hour_of_pollution=20)
         filename = "results/brute_force_single_results_18-20_window_" + water_network_path[9:] + ".txt"
     else:
         results_dict = brute_force_two_source(water_network_path, start_hour_of_pollution=18, end_hour_of_pollution=20)
@@ -911,13 +910,14 @@ def get_results_bruteforce(water_network_path, two_source=False):
 
 
 def get_results_pipe_diameter(water_network_path, two_source=False):
-
     # Get the results form first window
     if not two_source:
-        results_dict = pipe_diameter_method(water_network_path, start_hour_of_pollution=5, end_hour_of_pollution=7, two_source=False)
+        results_dict = pipe_diameter_method(water_network_path, start_hour_of_pollution=5, end_hour_of_pollution=7,
+                                            two_source=False)
         filename = "results/pipe_diameter_single_results_5-7_window_" + water_network_path[9:] + ".txt"
     else:
-        results_dict = pipe_diameter_method(water_network_path, start_hour_of_pollution=5, end_hour_of_pollution=7, two_source=True)
+        results_dict = pipe_diameter_method(water_network_path, start_hour_of_pollution=5, end_hour_of_pollution=7,
+                                            two_source=True)
         filename = "results/pipe_diameter_double_results_5-7_window_" + water_network_path[9:] + ".txt"
 
     # Save to textfile
@@ -929,10 +929,12 @@ def get_results_pipe_diameter(water_network_path, two_source=False):
     # Get the results form second window
 
     if not two_source:
-        results_dict = pipe_diameter_method(water_network_path, start_hour_of_pollution=13, end_hour_of_pollution=15, two_source=False)
+        results_dict = pipe_diameter_method(water_network_path, start_hour_of_pollution=13, end_hour_of_pollution=15,
+                                            two_source=False)
         filename = "results/pipe_diameter_single_results_13-15_window_" + water_network_path[9:] + ".txt"
     else:
-        results_dict = pipe_diameter_method(water_network_path, start_hour_of_pollution=13, end_hour_of_pollution=15, two_source=True)
+        results_dict = pipe_diameter_method(water_network_path, start_hour_of_pollution=13, end_hour_of_pollution=15,
+                                            two_source=True)
         filename = "results/pipe_diameter_double_results_13-15_window_" + water_network_path[9:] + ".txt"
 
     # Save to textfile
@@ -944,10 +946,12 @@ def get_results_pipe_diameter(water_network_path, two_source=False):
     # Get the results form third window
 
     if not two_source:
-        results_dict = pipe_diameter_method(water_network_path, start_hour_of_pollution=18, end_hour_of_pollution=20, two_source=False)
+        results_dict = pipe_diameter_method(water_network_path, start_hour_of_pollution=18, end_hour_of_pollution=20,
+                                            two_source=False)
         filename = "results/pipe_diameter_single_results_18-20_window_" + water_network_path[9:] + ".txt"
     else:
-        results_dict = pipe_diameter_method(water_network_path, start_hour_of_pollution=18, end_hour_of_pollution=20, two_source=True)
+        results_dict = pipe_diameter_method(water_network_path, start_hour_of_pollution=18, end_hour_of_pollution=20,
+                                            two_source=True)
         filename = "results/pipe_diameter_double_results_18-20_window_" + water_network_path[9:] + ".txt"
 
     # Save to textfile
@@ -958,12 +962,14 @@ def get_results_pipe_diameter(water_network_path, two_source=False):
 
 
 def get_results_max_outflow(water_network_path, two_source=False):
-       # Get the results form first window
+    # Get the results form first window
     if not two_source:
-        results_dict = max_outflow_method(water_network_path, start_hour_of_pollution=5, end_hour_of_pollution=7, two_source=False)
+        results_dict = max_outflow_method(water_network_path, start_hour_of_pollution=5, end_hour_of_pollution=7,
+                                          two_source=False)
         filename = "results/max_outflow_method_single_results_5-7_window_" + water_network_path[9:] + ".txt"
     else:
-        results_dict = max_outflow_method(water_network_path, start_hour_of_pollution=5, end_hour_of_pollution=7, two_source=True)
+        results_dict = max_outflow_method(water_network_path, start_hour_of_pollution=5, end_hour_of_pollution=7,
+                                          two_source=True)
         filename = "results/max_outflow_method_double_results_5-7_window_" + water_network_path[9:] + ".txt"
 
     # Save to textfile
@@ -974,10 +980,12 @@ def get_results_max_outflow(water_network_path, two_source=False):
 
     # Get the results form second window
     if not two_source:
-        results_dict = max_outflow_method(water_network_path, start_hour_of_pollution=13, end_hour_of_pollution=15, two_source=False)
+        results_dict = max_outflow_method(water_network_path, start_hour_of_pollution=13, end_hour_of_pollution=15,
+                                          two_source=False)
         filename = "results/max_outflow_single_results_13-15_window_" + water_network_path[9:] + ".txt"
     else:
-        results_dict = max_outflow_method(water_network_path, start_hour_of_pollution=13, end_hour_of_pollution=15, two_source=True)
+        results_dict = max_outflow_method(water_network_path, start_hour_of_pollution=13, end_hour_of_pollution=15,
+                                          two_source=True)
         filename = "results/max_outflow_double_results_13-15_window_" + water_network_path[9:] + ".txt"
 
     # Save to textfile
@@ -988,10 +996,12 @@ def get_results_max_outflow(water_network_path, two_source=False):
 
     # Get the results form third window
     if not two_source:
-        results_dict = max_outflow_method(water_network_path, start_hour_of_pollution=18, end_hour_of_pollution=20, two_source=False)
+        results_dict = max_outflow_method(water_network_path, start_hour_of_pollution=18, end_hour_of_pollution=20,
+                                          two_source=False)
         filename = "results/max_outflow_single_results_18-20_window_" + water_network_path[9:] + ".txt"
     else:
-        results_dict = max_outflow_method(water_network_path, start_hour_of_pollution=18, end_hour_of_pollution=20, two_source=True)
+        results_dict = max_outflow_method(water_network_path, start_hour_of_pollution=18, end_hour_of_pollution=20,
+                                          two_source=True)
         filename = "results/max_outflow_double_results_18-20_window_" + water_network_path[9:] + ".txt"
 
     # Save to textfile
@@ -1002,7 +1012,6 @@ def get_results_max_outflow(water_network_path, two_source=False):
 
 
 def get_results_combined(water_network_path, two_source=False):
-
     # Get the results form first window
     if not two_source:
         results_dict = combined_method(water_network_path, start_hour_of_pollution=5, end_hour_of_pollution=7,
@@ -1053,7 +1062,6 @@ def get_results_combined(water_network_path, two_source=False):
 
 
 def get_results_genetic(water_network_path, n_iter, n_nodes_in_pop, r_cross, r_mut, two_source=False):
-
     # Get the results form first window
     if not two_source:
         results_dict = genetic_algorithm_method(water_network_path, start_hour_of_pollution=5, end_hour_of_pollution=7,
@@ -1074,12 +1082,14 @@ def get_results_genetic(water_network_path, n_iter, n_nodes_in_pop, r_cross, r_m
 
     # Get the results form second window
     if not two_source:
-        results_dict = genetic_algorithm_method(water_network_path, start_hour_of_pollution=13, end_hour_of_pollution=15,
+        results_dict = genetic_algorithm_method(water_network_path, start_hour_of_pollution=13,
+                                                end_hour_of_pollution=15,
                                                 n_iter=n_iter, n_nodes_in_pop=n_nodes_in_pop, r_cross=r_cross,
                                                 r_mut=r_mut, two_source=False)
         filename = "results/genetic_algorithm_method_single_results_13-15_window_" + water_network_path[9:] + ".txt"
     else:
-        results_dict = genetic_algorithm_method(water_network_path, start_hour_of_pollution=13, end_hour_of_pollution=15,
+        results_dict = genetic_algorithm_method(water_network_path, start_hour_of_pollution=13,
+                                                end_hour_of_pollution=15,
                                                 n_iter=n_iter, n_nodes_in_pop=n_nodes_in_pop, r_cross=r_cross,
                                                 r_mut=r_mut, two_source=True)
         filename = "results/genetic_algorithm_method_double_results_13-15_window_" + water_network_path[9:] + ".txt"
@@ -1092,12 +1102,14 @@ def get_results_genetic(water_network_path, n_iter, n_nodes_in_pop, r_cross, r_m
 
     # Get the results form third window
     if not two_source:
-        results_dict = genetic_algorithm_method(water_network_path, start_hour_of_pollution=18, end_hour_of_pollution=20,
+        results_dict = genetic_algorithm_method(water_network_path, start_hour_of_pollution=18,
+                                                end_hour_of_pollution=20,
                                                 n_iter=n_iter, n_nodes_in_pop=n_nodes_in_pop, r_cross=r_cross,
                                                 r_mut=r_mut, two_source=False)
         filename = "results/genetic_algorithm_method_single_results_18-20_window_" + water_network_path[9:] + ".txt"
     else:
-        results_dict = genetic_algorithm_method(water_network_path, start_hour_of_pollution=18, end_hour_of_pollution=20,
+        results_dict = genetic_algorithm_method(water_network_path, start_hour_of_pollution=18,
+                                                end_hour_of_pollution=20,
                                                 n_iter=n_iter, n_nodes_in_pop=n_nodes_in_pop, r_cross=r_cross,
                                                 r_mut=r_mut, two_source=True)
         filename = "results/genetic_algorithm_method_double_results_18-20_window_" + water_network_path[9:] + ".txt"
@@ -1110,6 +1122,7 @@ def get_results_genetic(water_network_path, n_iter, n_nodes_in_pop, r_cross, r_m
 
 
 if __name__ == '__main__':
+    get_results_pipe_diameter("networks/Net1.inp", two_source=True)
     # Pipe diameter
     get_results_pipe_diameter("networks/Net1.inp")
     get_results_pipe_diameter("networks/Net1.inp", two_source=True)
