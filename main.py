@@ -4,7 +4,6 @@ import numpy as np
 import wntr
 import pandas as pd
 import statistics
-import pygad
 
 # Constants
 MINUTE = 60
@@ -35,6 +34,8 @@ def brute_force_single_source(water_network_path, start_hour_of_pollution, end_h
     # Running simulations of pollution for all the nodes
     for i in range(len(water_network_dict['nodes'])):
         t_node_to_pollute = [water_network_dict['nodes'][i]['name']]
+        # Reset the water network model
+        water_network = wntr.network.WaterNetworkModel(water_network_path)
         analysis_results = pollution_analysis(water_network, t_node_to_pollute, start_hour_of_pollution,
                                               end_hour_of_pollution)
         dataframe_structure['iteration'] = i
@@ -96,6 +97,8 @@ def brute_force_two_source(water_network_path, start_hour_of_pollution, end_hour
         for j in range(len(water_network_dict['nodes'])):
             if not i == j:
                 t_nodes_to_pollute = [water_network_dict['nodes'][i]['name'], water_network_dict['nodes'][j]['name']]
+                # Reset the water network model
+                water_network = wntr.network.WaterNetworkModel(water_network_path)
                 analysis_results = pollution_analysis(water_network, t_nodes_to_pollute, start_hour_of_pollution,
                                                       end_hour_of_pollution)
                 dataframe_structure['Node'] = t_nodes_to_pollute[0] + ' ' + t_nodes_to_pollute[1]
@@ -274,12 +277,12 @@ def visualise_pollution(water_network_path, nodes_to_pollute, start_hour_of_poll
 
 
 def pipe_diameter_method(water_network_path, start_hour_of_pollution, end_hour_of_pollution, two_source=False):
+    # Start time counter
+    start_time = perf_counter()
     # Create a water network model
     water_network = wntr.network.WaterNetworkModel(water_network_path)
     # Create Water Network dictionary
     wn_dict = water_network.to_dict()
-    # Start time counter
-    start_time = perf_counter()
     # Get list of diameters
     diameters = []
     for link in wn_dict['links']:
@@ -299,6 +302,7 @@ def pipe_diameter_method(water_network_path, start_hour_of_pollution, end_hour_o
             if link_name == link['name']:
                 selected_nodes.append(link['start_node_name'])
                 break
+    selected_nodes = list(set(selected_nodes))
     # Check if tow source pollution is possible
     if two_source:
         if len(selected_nodes) < 2:
@@ -315,6 +319,8 @@ def pipe_diameter_method(water_network_path, start_hour_of_pollution, end_hour_o
     df_results = pd.DataFrame(dataframe_structure)
     if not two_source:
         for element in selected_nodes:
+            # Reset the water network model
+            water_network = wntr.network.WaterNetworkModel(water_network_path)
             analysis_results = pollution_analysis(water_network, [element], start_hour_of_pollution,
                                                   end_hour_of_pollution)
             dataframe_structure = {
@@ -329,6 +335,8 @@ def pipe_diameter_method(water_network_path, start_hour_of_pollution, end_hour_o
         for element1 in selected_nodes:
             for element2 in selected_nodes:
                 if not element1 == element2:
+                    # Reset the water network model
+                    water_network = wntr.network.WaterNetworkModel(water_network_path)
                     analysis_results = pollution_analysis(water_network, [element1, element2], start_hour_of_pollution,
                                                           end_hour_of_pollution)
                     dataframe_structure = {
@@ -375,13 +383,12 @@ def select_flowrate(dict_tuple):
 
 
 def max_outflow_method(water_network_path, start_hour_of_pollution, end_hour_of_pollution, two_source=False):
+    # Start time counter
+    start_time = perf_counter()
     # Create a water network model
     water_network = wntr.network.WaterNetworkModel(water_network_path)
     # Create Water Network dictionary
     wn_dict = water_network.to_dict()
-    # Start time counter
-    start_time = perf_counter()
-
     # Create a mapping of output links to nodes
     node_link_map = {}
     for n in wn_dict['nodes']:
@@ -436,6 +443,8 @@ def max_outflow_method(water_network_path, start_hour_of_pollution, end_hour_of_
     df_results = pd.DataFrame(dataframe_structure)
     if not two_source:
         for element in selected_nodes:
+            # Reset the water network model
+            water_network = wntr.network.WaterNetworkModel(water_network_path)
             analysis_results = pollution_analysis(water_network, [element], start_hour_of_pollution,
                                                   end_hour_of_pollution)
             dataframe_structure = {
@@ -450,6 +459,8 @@ def max_outflow_method(water_network_path, start_hour_of_pollution, end_hour_of_
         for element1 in selected_nodes:
             for element2 in selected_nodes:
                 if not element1 == element2:
+                    # Reset the water network model
+                    water_network = wntr.network.WaterNetworkModel(water_network_path)
                     analysis_results = pollution_analysis(water_network, [element1, element2], start_hour_of_pollution,
                                                           end_hour_of_pollution)
                     dataframe_structure = {
@@ -492,12 +503,12 @@ def max_outflow_method(water_network_path, start_hour_of_pollution, end_hour_of_
 
 
 def combined_method(water_network_path, start_hour_of_pollution, end_hour_of_pollution, two_source=False):
+    # Start time counter
+    start_time = perf_counter()
     # Create a water network model
     water_network = wntr.network.WaterNetworkModel(water_network_path)
     # Create Water Network dictionary
     wn_dict = water_network.to_dict()
-    # Start time counter
-    start_time = perf_counter()
 
     # Select nodes by outflow
     # Create a mapping of output links to nodes
@@ -586,6 +597,8 @@ def combined_method(water_network_path, start_hour_of_pollution, end_hour_of_pol
     df_results = pd.DataFrame(dataframe_structure)
     if not two_source:
         for element in selected_nodes:
+            # Reset the water network model
+            water_network = wntr.network.WaterNetworkModel(water_network_path)
             analysis_results = pollution_analysis(water_network, [element], start_hour_of_pollution,
                                                   end_hour_of_pollution)
             dataframe_structure = {
@@ -600,6 +613,8 @@ def combined_method(water_network_path, start_hour_of_pollution, end_hour_of_pol
         for element1 in selected_nodes:
             for element2 in selected_nodes:
                 if not element1 == element2:
+                    # Reset the water network model
+                    water_network = wntr.network.WaterNetworkModel(water_network_path)
                     analysis_results = pollution_analysis(water_network, [element1, element2], start_hour_of_pollution,
                                                           end_hour_of_pollution)
                     dataframe_structure = {
@@ -641,7 +656,7 @@ def combined_method(water_network_path, start_hour_of_pollution, end_hour_of_pol
     return return_dict
 
 
-# objective function
+# Objective function for genetic algorithm
 def genetic_algorithm_objective(pop, water_network_path, start_hour_of_pollution, end_hour_of_pollution, mode='global',
                                 two_source=False):
     # Create a water network model
@@ -741,9 +756,11 @@ def genetic_algorithm(objective, n_nodes, n_iter, n_pop, r_cross, r_mut, n_nodes
                 temp_pop.append(0)
         pop.append(temp_pop)
 
-    # keep track of best solution
+    # Remember best solution
     best, best_eval = pop[0], objective(pop[0], water_network_path, start_hour_of_pollution, end_hour_of_pollution,
                                         mode, two_source)
+    # Keep track of generations without improvement
+    timestamp = 0
     # enumerate generations
     for gen in range(n_iter):
         # evaluate all candidates in the population
@@ -753,7 +770,7 @@ def genetic_algorithm(objective, n_nodes, n_iter, n_pop, r_cross, r_mut, n_nodes
         for i in range(n_pop):
             if scores[i] > best_eval:
                 best, best_eval = pop[i], scores[i]
-                print(">%d, new best f(%s) = %.3f" % (gen, pop[i], scores[i]))
+                timestamp = 0
         # select parents
         selected = [selection(pop, scores) for _ in range(n_pop)]
         # create the next generation
@@ -773,11 +790,15 @@ def genetic_algorithm(objective, n_nodes, n_iter, n_pop, r_cross, r_mut, n_nodes
         # replace population
         pop = children
         n_pop = len(pop)
-    return [best, best_eval]
+        timestamp += 1
+        # If more than 10 generations with no improvement than stop
+        if timestamp >= 9:
+            break
+    return best
 
 
 def genetic_algorithm_method(water_network_path, start_hour_of_pollution, end_hour_of_pollution, n_iter, n_nodes_in_pop,
-                             r_cross, r_mut, two_source=False):
+                             r_cross, r_mut, mode='global', two_source=False):
     # Start time counter
     start_time = perf_counter()
     # Create water network
@@ -786,11 +807,10 @@ def genetic_algorithm_method(water_network_path, start_hour_of_pollution, end_ho
     # Prepare and run the algorithm
     n_nodes = len(wn_dict['nodes'])
     n_pop = round(n_nodes / n_nodes_in_pop)
-    [best_nodes, best_eval] = genetic_algorithm(genetic_algorithm_objective, n_nodes=n_nodes, n_iter=n_iter,
-                                                n_pop=n_pop,
-                                                r_cross=r_cross, r_mut=r_mut, n_nodes_in_pop=n_nodes_in_pop,
-                                                water_network_path="networks/Net1.inp", start_hour_of_pollution=5,
-                                                end_hour_of_pollution=7, mode='global', two_source=two_source)
+    best_nodes = genetic_algorithm(genetic_algorithm_objective, n_nodes=n_nodes, n_iter=n_iter, n_pop=n_pop,
+                                   r_cross=r_cross, r_mut=r_mut, n_nodes_in_pop=n_nodes_in_pop,
+                                   water_network_path=water_network_path, start_hour_of_pollution=start_hour_of_pollution,
+                                   end_hour_of_pollution=end_hour_of_pollution, mode=mode, two_source=two_source)
     # Prepare selected nodes
     selected_nodes = []
     for node_nr in range(len(wn_dict['nodes'])):
@@ -1016,7 +1036,7 @@ def get_results_combined(water_network_path, two_source=False):
     if not two_source:
         results_dict = combined_method(water_network_path, start_hour_of_pollution=5, end_hour_of_pollution=7,
                                        two_source=False)
-        filename = "results/max_outflow_method_single_results_5-7_window_" + water_network_path[9:] + ".txt"
+        filename = "results/combined_method_double_single_results_5-7_window_" + water_network_path[9:] + ".txt"
     else:
         results_dict = combined_method(water_network_path, start_hour_of_pollution=5, end_hour_of_pollution=7,
                                        two_source=True)
@@ -1121,67 +1141,128 @@ def get_results_genetic(water_network_path, n_iter, n_nodes_in_pop, r_cross, r_m
     print('Genetic algorithm 18-20 done!')
 
 
+def get_results(water_network_path, method, n_iter=0, n_nodes_in_pop=0, r_cross=0, r_mut=0, two_source=False):
+    # Check if genetic algorithm is used
+    if method.__name__ == "genetic_algorithm_method":
+        for i in range(2):
+            if i == 0:
+                start_hour_of_pollution = 5
+                end_hour_of_pollution = 7
+            elif i == 1:
+                start_hour_of_pollution = 13
+                end_hour_of_pollution = 15
+            else:
+                start_hour_of_pollution = 18
+                end_hour_of_pollution = 20
+
+            # Get the results
+            if not two_source:
+                results_dict = method(water_network_path, start_hour_of_pollution, end_hour_of_pollution, n_iter,
+                                      n_nodes_in_pop, r_cross, r_mut, two_source=False)
+                filename = ("results/" + method.__name__ + "_single_results_"+str(start_hour_of_pollution)+"-"+
+                            str(end_hour_of_pollution)+"_window_" + water_network_path[9:]+".txt")
+            else:
+                results_dict = method(water_network_path, start_hour_of_pollution, end_hour_of_pollution, n_iter,
+                                      n_nodes_in_pop, r_cross, r_mut, two_source=True)
+                filename = ("results/" + method.__name__ + "_double_results_" + str(start_hour_of_pollution) + "-" +
+                            str(end_hour_of_pollution) + "_window_" + water_network_path[9:] + ".txt")
+            # Save to textfile
+            with open(filename, 'w') as results_file:
+                for key, value in results_dict.items():
+                    results_file.write('%s:%s\n' % (key, value))
+    else:
+        for i in range(3):
+            if i == 0:
+                start_hour_of_pollution = 5
+                end_hour_of_pollution = 7
+            elif i == 1:
+                start_hour_of_pollution = 13
+                end_hour_of_pollution = 15
+            else:
+                start_hour_of_pollution = 18
+                end_hour_of_pollution = 20
+
+            # Get the results
+            if not two_source:
+                results_dict = method(water_network_path, start_hour_of_pollution, end_hour_of_pollution, False)
+                filename = ("results/" + method.__name__ + "_single_results_"+str(start_hour_of_pollution)+"-"+
+                            str(end_hour_of_pollution)+"_window_" + water_network_path[9:]+".txt")
+            else:
+                results_dict = method(water_network_path, start_hour_of_pollution, end_hour_of_pollution, True)
+                filename = ("results/" + method.__name__ + "_double_results_" + str(start_hour_of_pollution) + "-" +
+                            str(end_hour_of_pollution) + "_window_" + water_network_path[9:] + ".txt")
+            # Save to textfile
+            with open(filename, 'w') as results_file:
+                for key, value in results_dict.items():
+                    results_file.write('%s:%s\n' % (key, value))
+
+
 if __name__ == '__main__':
-    # Pipe diameter
-    get_results_pipe_diameter("networks/Net1.inp")
-    get_results_pipe_diameter("networks/Net1.inp", two_source=True)
-    print('Net1 pipe diameter done!')
-    get_results_pipe_diameter("networks/Net3.inp")
-    get_results_pipe_diameter("networks/Net3.inp", two_source=True)
-    print('Net3 pipe diameter done!')
-    get_results_pipe_diameter("networks/LongTermImprovement.inp")
-    get_results_pipe_diameter("networks/LongTermImprovement.inp", two_source=True)
-    print('Long Term Improvement pipe diameter done!')
+    if False:
+        # Pipe diameter
+        get_results_pipe_diameter("networks/Net1.inp")
+        get_results_pipe_diameter("networks/Net1.inp", two_source=True)
+        print('Net1 pipe diameter done!')
+        get_results_pipe_diameter("networks/Net3.inp")
+        get_results_pipe_diameter("networks/Net3.inp", two_source=True)
+        print('Net3 pipe diameter done!')
+        get_results_pipe_diameter("networks/LongTermImprovement.inp")
+        get_results_pipe_diameter("networks/LongTermImprovement.inp", two_source=True)
+        print('Long Term Improvement pipe diameter done!')
 
-    # Max outflow
-    get_results_max_outflow("networks/Net1.inp")
-    get_results_max_outflow("networks/Net1.inp", two_source=True)
-    print('Net1 max outflow done!')
-    get_results_max_outflow("networks/Net3.inp")
-    get_results_max_outflow("networks/Net3.inp", two_source=True)
-    print('Net3 max outflow done!')
-    get_results_max_outflow("networks/LongTermImprovement.inp")
-    get_results_max_outflow("networks/LongTermImprovement.inp", two_source=True)
-    print('Long Term Improvement max outflow done!')
+        # Max outflow
+        get_results_max_outflow("networks/Net1.inp")
+        get_results_max_outflow("networks/Net1.inp", two_source=True)
+        print('Net1 max outflow done!')
+        get_results_max_outflow("networks/Net3.inp")
+        get_results_max_outflow("networks/Net3.inp", two_source=True)
+        print('Net3 max outflow done!')
+        get_results_max_outflow("networks/LongTermImprovement.inp")
+        get_results_max_outflow("networks/LongTermImprovement.inp", two_source=True)
+        print('Long Term Improvement max outflow done!')
 
-    # Combined
-    get_results_combined("networks/Net1.inp")
-    get_results_combined("networks/Net1.inp", two_source=True)
-    print('Net1 combined done!')
-    get_results_combined("networks/Net3.inp")
-    get_results_combined("networks/Net3.inp", two_source=True)
-    print('Net3 combined done!')
-    get_results_combined("networks/LongTermImprovement.inp")
-    get_results_combined("networks/LongTermImprovement.inp", two_source=True)
-    print('Long Term Improvement combined done!')
+        # Combined
+        get_results_combined("networks/Net1.inp")
+        get_results_combined("networks/Net1.inp", two_source=True)
+        print('Net1 combined done!')
+        get_results_combined("networks/Net3.inp")
+        get_results_combined("networks/Net3.inp", two_source=True)
+        print('Net3 combined done!')
+        get_results_combined("networks/LongTermImprovement.inp")
+        get_results_combined("networks/LongTermImprovement.inp", two_source=True)
+        print('Long Term Improvement combined done!')
 
-    # Genetic
-    get_results_genetic("networks/Net1.inp", n_iter=10, n_nodes_in_pop=4, r_cross=0.9, r_mut=0.1)
-    get_results_genetic("networks/Net1.inp", n_iter=10, n_nodes_in_pop=4, r_cross=0.9, r_mut=0.1,
+        # Genetic
+        get_results_genetic("networks/Net1.inp", n_iter=10, n_nodes_in_pop=4, r_cross=0.9, r_mut=0.1)
+        get_results_genetic("networks/Net1.inp", n_iter=10, n_nodes_in_pop=4, r_cross=0.9, r_mut=0.1,
+                            two_source=True)
+        print('Net1 genetic done!')
+        get_results_genetic("networks/Net3.inp", n_iter=10, n_nodes_in_pop=4, r_cross=0.9, r_mut=0.1)
+        get_results_genetic("networks/Net3.inp", n_iter=10, n_nodes_in_pop=4, r_cross=0.9, r_mut=0.1,
                         two_source=True)
-    print('Net1 genetic done!')
-    get_results_genetic("networks/Net3.inp", n_iter=10, n_nodes_in_pop=4, r_cross=0.9, r_mut=0.1)
-    get_results_genetic("networks/Net3.inp", n_iter=10, n_nodes_in_pop=4, r_cross=0.9, r_mut=0.1,
-                        two_source=True)
-    print('Net3 genetic done!')
+        print('Net3 genetic done!')
+
+
+        # Single source brute force
+        get_results_bruteforce("networks/Net1.inp")
+        print('Net1 brute force done!')
+        get_results_bruteforce("networks/Net3.inp")
+        print('Net3 brute force done!')
+        get_results_bruteforce("networks/LongTermImprovement.inp")
+        print('LTI brute force done!')
+
+        # Dual source brute force
+        get_results_bruteforce(water_network_path="networks/Net1.inp", two_source=True)
+        print('Net1 brute force done!')
+    print('Start!')
+    get_results_bruteforce(water_network_path="networks/Net3.inp", two_source=True)
+    print('Net3 brute force done!')
+
+
     get_results_genetic("networks/LongTermImprovement.inp", n_iter=10, n_nodes_in_pop=4, r_cross=0.9, r_mut=0.1)
     get_results_genetic("networks/LongTermImprovement.inp", n_iter=10, n_nodes_in_pop=4, r_cross=0.9, r_mut=0.1,
                         two_source=True)
     print('Long Term Improvement genetic done!')
 
-    # Single source brute force
-    get_results_bruteforce("networks/Net1.inp")
-    print('Net1 brute force done!')
-    get_results_bruteforce("networks/Net3.inp")
-    print('Net3 brute force done!')
-    get_results_bruteforce("networks/LongTermImprovement.inp")
+    get_results_bruteforce(water_network_path="networks/LongTermImprovement.inp", two_source=True)
     print('LTI brute force done!')
-
-    # Dual source brute force
-    get_results_bruteforce(water_network_path="networks/Net1.inp", two_source=True)
-    print('Net1 brute force done!')
-    get_results_bruteforce(water_network_path="networks/Net3.inp", two_source=True)
-    print('Net3 brute force done!')
-
-    # get_results_bruteforce(water_network_path="networks/LongTermImprovement.inp", two_source=True)
-    # print('LTI brute force done!'
