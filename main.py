@@ -168,8 +168,7 @@ def brute_force_method(water_network_path, start_hour_of_pollution, end_hour_of_
     if not two_source:
         # Running simulations of pollution for all the nodes
         for node in water_network_dict['nodes']:
-            if node['node_type'] == 'Tank' or node['node_type'] == 'Reservoir':
-                continue
+            if not node['node_type'] == 'Junction': continue
             t_node_to_pollute = [node['name']]
             # Reset the water network model
             water_network = wntr.network.WaterNetworkModel(water_network_path)
@@ -185,10 +184,10 @@ def brute_force_method(water_network_path, start_hour_of_pollution, end_hour_of_
     else:
         # Running simulations of pollution for all the nodes
         for node_1 in water_network_dict['nodes']:
-            if node_1['node_type'] == 'Tank' or node_1['node_type'] == 'Reservoir': continue
+            if not node_1['node_type'] == 'Junction': continue
             for node_2 in water_network_dict['nodes']:
                 if not node_1['name'] == node_2['name']:
-                    if node_2['node_type'] == 'Tank' or node_2['node_type'] == 'Reservoir': continue
+                    if not node_2['node_type'] == 'Junction': continue
                     t_nodes_to_pollute = [node_1['name'], node_2['name']]
                     # Reset the water network model
                     water_network = wntr.network.WaterNetworkModel(water_network_path)
@@ -263,10 +262,8 @@ def pipe_diameter_method(water_network_path, start_hour_of_pollution, end_hour_o
     # Get list of diameters
     diameters = []
     for link in wn_dict['links']:
-        if link['link_type'] == 'Pump':
-            break
-        else:
-            diameters.append(link['diameter'])
+        if link['link_type'] == 'Pump': continue
+        else: diameters.append(link['diameter'])
     diameters = sorted(list(set(diameters)), reverse=True)
 
     # Get links with 2 biggest diameters
@@ -283,7 +280,7 @@ def pipe_diameter_method(water_network_path, start_hour_of_pollution, end_hour_o
     #Get rid of Tanks and Reservoirs
     selected_nodes = []
     for node in preselected_nodes:
-        if node['node_type'] == 'Junction': selected_nodes.append(node)
+        if water_network.get_node(node).__class__.__name__ == 'Junction': selected_nodes.append(node)
     # Check if two source pollution is possible
     if two_source:
         if len(selected_nodes) < 2:
@@ -373,6 +370,7 @@ def max_outflow_method(water_network_path, start_hour_of_pollution, end_hour_of_
     # Create a mapping of output links to nodes
     node_link_map = {}
     for n in wn_dict['nodes']:
+        if not n['node_type'] == 'Junction': continue
         list_of_links = water_network.get_links_for_node(node_name=n['name'], flag='OUTLET')
         dictionary_row = {
             'Node': n['name'],
@@ -405,12 +403,12 @@ def max_outflow_method(water_network_path, start_hour_of_pollution, end_hour_of_
 
     # Select top 10% of nodes to try for pollution
     selected_nodes = []
-    n = round(0.1 * len(wn_dict['nodes']))
-    if n < 2:
-        n = 2
+    number_of_nodes = round(0.1 * len(node_link_map))
+    if number_of_nodes < 2:
+        number_of_nodes = 2
     # Sort by flowrate descending
     node_link_map = sorted(node_link_map.items(), key=select_flowrate, reverse=True)
-    for i in range(n):
+    for i in range(number_of_nodes):
         selected_nodes.append(node_link_map[i][0])
 
     # Generate results for select nodes
@@ -1180,9 +1178,9 @@ def get_results(water_network_path, method, n_iter=0, n_nodes_in_pop=0, r_cross=
 
 if __name__ == '__main__':
 
-    #get_results("networks/Net1.inp",brute_force_method, two_source=False)
-    get_results("networks/Net1.inp",brute_force_method, two_source=True)
-    #get_results("networks/Net1.inp", brute_force_single_source)
+    get_results("networks/LongTermImprovement.inp", max_outflow_method, two_source=False)
+    #get_results("networks/Net1.inp",brute_force_method, two_source=True)
+
     if False:
         # Pipe diameter
         get_results_pipe_diameter("networks/Net1.inp")
