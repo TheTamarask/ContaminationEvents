@@ -1,9 +1,11 @@
 import copy
+from math import ceil
 from time import perf_counter
 import numpy as np
 import wntr
 import pandas as pd
 import statistics
+import matplotlib.pyplot as plt
 
 # Constants
 MINUTE = 60
@@ -758,7 +760,7 @@ def genetic_algorithm_method(water_network_path, start_hour_of_pollution, end_ho
     wn_dict = water_network.to_dict()
     # Prepare and run the algorithm
     n_nodes = len(wn_dict['nodes'])
-    n_pop = round(n_nodes / n_nodes_in_pop)
+    n_pop = ceil(n_nodes / n_nodes_in_pop)
     best_nodes = genetic_algorithm(genetic_algorithm_objective, n_nodes=n_nodes, n_iter=n_iter, n_pop=n_pop,
                                    r_cross=r_cross, r_mut=r_mut, n_nodes_in_pop=n_nodes_in_pop,
                                    water_network_path=water_network_path, start_hour_of_pollution=start_hour_of_pollution,
@@ -806,39 +808,43 @@ def genetic_algorithm_method(water_network_path, start_hour_of_pollution, end_ho
                     df_results.loc[len(df_results)] = dataframe_structure
 
     # Prepare results
-    return_dict = {
-        'Alltime best node': [],
-        'Alltime best pollution [%]': [],
-        'Max polluted source node': [],
-        'Max polluted nodes [%]': [],
-        'Sim end best node': [],
-        'Sim end best pollution': [],
-        'Duration': []
-    }
-    # Alltime
-    df_results = df_results.sort_values(by=['Alltime polluted nodes [%]'], ascending=False)
-    return_dict['Alltime best node'] = df_results.iloc[0]['Node']
-    return_dict['Alltime best pollution [%]'] = df_results.iloc[0]['Alltime polluted nodes [%]']
-    # Max polluted
-    df_results = df_results.sort_values(by=['Max polluted nodes [%]'], ascending=False)
-    return_dict['Max polluted source node'] = df_results.iloc[0]['Node'],
-    return_dict['Max polluted nodes [%]'] = df_results.iloc[0]['Max polluted nodes [%]'],
-    # Sim end
-    df_results = df_results.sort_values(by=['Simulation end polluted nodes [%]'], ascending=False)
-    return_dict['Sim end best node'] = df_results.iloc[0]['Node']
-    return_dict['Sim end best pollution'] = df_results.iloc[0]['Simulation end polluted nodes [%]']
+    if len(df_results) > 5:
+        n_of_results = 5
+    else:
+        n_of_results = len(df_results)
+    temp_alltime_node = []
+    temp_alltime = []
+    temp_max_node = []
+    temp_max = []
+    temp_sim_end_node = []
+    temp_sim_end = []
+    for n in range(n_of_results):
+        # Alltime
+        df_results = df_results.sort_values(by=['Alltime polluted nodes [%]'], ascending=False)
+        temp_alltime_node.append(df_results.iloc[n]['Node'])
+        temp_alltime.append(df_results.iloc[n]['Alltime polluted nodes [%]'])
+        # Max polluted
+        df_results = df_results.sort_values(by=['Max polluted nodes [%]'], ascending=False)
+        temp_max_node.append(df_results.iloc[n]['Node'])
+        temp_max.append(df_results.iloc[n]['Max polluted nodes [%]'])
+        # Sim end
+        df_results = df_results.sort_values(by=['Simulation end polluted nodes [%]'], ascending=False)
+        temp_sim_end_node.append(df_results.iloc[n]['Node'])
+        temp_sim_end.append(df_results.iloc[n]['Simulation end polluted nodes [%]'])
     # Stop time measure
     end_time = perf_counter()
     duration = end_time - start_time
-    return_dict['Duration'] = duration
-
+    return_dict = {'TOP 5 Alltime best node': temp_alltime_node, 'TOP 5 Alltime best pollution [%]': temp_alltime,
+                   'TOP 5 Max polluted source node': temp_max_node, 'TOP 5 Max polluted nodes [%]': temp_max,
+                   'TOP 5 Sim end best node': temp_sim_end_node, 'TOP 5 Sim end best pollution': temp_sim_end,
+                   'Duration': duration}
     return return_dict
 
 
 def get_results(water_network_path, method, n_iter=0, n_nodes_in_pop=0, r_cross=0, r_mut=0, two_source=False):
     # Check if genetic algorithm is used
     if method.__name__ == "genetic_algorithm_method":
-        for i in range(2):
+        for i in range(3):
             if i == 0:
                 start_hour_of_pollution = 5
                 end_hour_of_pollution = 7
@@ -891,56 +897,124 @@ def get_results(water_network_path, method, n_iter=0, n_nodes_in_pop=0, r_cross=
                     results_file.write('%s:%s\n' % (key, value))
 
 
+def visualise_pollution_spread(water_network_path, nodes_to_pollute, start_hour_of_pollution, end_hour_of_pollution, timestep=900):
+    water_network = wntr.network.WaterNetworkModel(water_network_path)
+    # Create dictionary
+    wn_dict = wntr.network.to_dict(water_network)
+
+    # Define timesteps of the simulation for CHEMICAL ...
+    water_network.options.time.start_clocktime = 0
+    water_network.options.time.duration = start_hour_of_pollution * HOUR + HOURS_OF_SIMULATION * HOUR
+    water_network.options.time.pattern_timestep = HOUR
+    water_network.options.time.hydraulic_timestep = timestep
+    water_network.options.time.quality_timestep = timestep
+    water_network.options.time.report_timestep = timestep
+    sim = wntr.sim.EpanetSimulator(water_network)
+
+    if not 'PollutionPattern' in water_network.pattern_name_list:
+        # Define pollution pattern
+        pollution_pattern = wntr.network.elements.Pattern.binary_pattern('PollutionPattern',
+                                                                         start_time=start_hour_of_pollution * HOUR,
+                                                                         end_time=end_hour_of_pollution * HOUR,
+                                                                         duration=water_network.options.time.duration,
+                                                                         step_size=water_network.options.time.pattern_timestep)
+        water_network.add_pattern('PollutionPattern', pollution_pattern)
+
+    # Poison select nodes in CHEMICAL sim network
+    for element in nodes_to_pollute:
+        water_network.add_source('PollutionSource_' + element, element, 'SETPOINT',
+                                 POLLUTION_AMOUNT, 'PollutionPattern')
+    water_network.options.quality.parameter = 'CHEMICAL'
+
+    # Prepare results structures
+    step_results_list = list()
+    df_polluted_nodes_alltime = pd.DataFrame()
+    step_results_dict = {
+        'Step': [],
+        'Time [s]': [],
+        'Nodes': [],
+        'Number_of_polluted_nodes': [],
+        'Node status[true/false]': []
+    }
+
+    # Then run simulation step by step
+    sim_steps = int((start_hour_of_pollution * HOUR + HOURS_OF_SIMULATION * HOUR) / timestep)  # hours
+
+    for step in range(0, sim_steps + 1):
+        water_network.options.time.duration = step * timestep
+        simulation_results = sim.run_sim()
+        pollution_data = simulation_results.node['quality'].loc[step * timestep, :]
+
+        # Get list of polluted nodes
+        # Extract the number of junctions that are polluted above the threshold
+        series_polluted_nodes = pollution_data.ge(POLLUTION_THRESHOLD)
+        series_polluted_nodes_trimmed = series_polluted_nodes[series_polluted_nodes]
+        df_polluted_nodes = series_polluted_nodes.to_frame().reset_index()
+        df_polluted_nodes = df_polluted_nodes.rename(columns={step * timestep: 'pollution'})
+        number_of_polluted_nodes = sum(series_polluted_nodes_trimmed)
+        if (step % 8) == 0 and int(step*15/60) >= start_hour_of_pollution:
+            # Max pollution visualisation
+            df_polluted_nodes_trim = df_polluted_nodes[df_polluted_nodes['pollution']]
+            max_pollution_series = df_polluted_nodes_trim['name']
+            max_pollution_list = max_pollution_series.tolist()
+            title = 'Pollution reach at '+str(int((step * 15) / 60 %24))+':00'
+            ax1 = wntr.graphics.plot_interactive_network(water_network, node_attribute=max_pollution_list, title=title)
+
+
+
 if __name__ == '__main__':
+    print("STARTED!")
+    nodes_to_pollute= ['60', '601']
+    visualise_pollution_spread("networks/Net3.inp", nodes_to_pollute=nodes_to_pollute, start_hour_of_pollution= 5, end_hour_of_pollution=7)
+    if False:
+        get_results("networks/Net1.inp", max_outflow_method, two_source=False)
+        print("Outflow single Net1 done!")
+        get_results("networks/Net1.inp", max_outflow_method, two_source=True)
+        print("Outflow double Net1 done!")
+        get_results("networks/Net3.inp", max_outflow_method, two_source=False)
+        print("Outflow single Net3 done!")
+        get_results("networks/Net3.inp", max_outflow_method, two_source=True)
+        print("Outflow double Net3 done!")
+        get_results("networks/LongTermImprovement.inp", max_outflow_method, two_source=False)
+        print("Outflow single LongTermImprovement done!")
+        get_results("networks/LongTermImprovement.inp", max_outflow_method, two_source=True)
+        print("Outflow double LongTermImprovement done!")
 
-    get_results("networks/Net1.inp", max_outflow_method, two_source=False)
-    print("Outflow single Net1 done!")
-    get_results("networks/Net1.inp", max_outflow_method, two_source=True)
-    print("Outflow double Net1 done!")
-    get_results("networks/Net3.inp", max_outflow_method, two_source=False)
-    print("Outflow single Net3 done!")
-    get_results("networks/Net3.inp", max_outflow_method, two_source=True)
-    print("Outflow double Net3 done!")
-    get_results("networks/LongTermImprovement.inp", max_outflow_method, two_source=False)
-    print("Outflow single LongTermImprovement done!")
-    get_results("networks/LongTermImprovement.inp", max_outflow_method, two_source=True)
-    print("Outflow double LongTermImprovement done!")
+        get_results("networks/Net1.inp", pipe_diameter_method, two_source=False)
+        print("Diameter single Net1 done!")
+        get_results("networks/Net1.inp", pipe_diameter_method, two_source=True)
+        print("Diameter double Net1 done!")
+        get_results("networks/Net3.inp", pipe_diameter_method, two_source=False)
+        print("Diameter single Net3 done!")
+        get_results("networks/Net3.inp", pipe_diameter_method, two_source=True)
+        print("Diameter double Net3 done!")
+        get_results("networks/LongTermImprovement.inp", pipe_diameter_method, two_source=False)
+        print("Diameter single LongTermImprovement done!")
+        get_results("networks/LongTermImprovement.inp", pipe_diameter_method, two_source=True)
+        print("Diameter double LongTermImprovement done!")
 
-    get_results("networks/Net1.inp", pipe_diameter_method, two_source=False)
-    print("Diameter single Net1 done!")
-    get_results("networks/Net1.inp", pipe_diameter_method, two_source=True)
-    print("Diameter double Net1 done!")
-    get_results("networks/Net3.inp", pipe_diameter_method, two_source=False)
-    print("Diameter single Net3 done!")
-    get_results("networks/Net3.inp", pipe_diameter_method, two_source=True)
-    print("Diameter double Net3 done!")
-    get_results("networks/LongTermImprovement.inp", pipe_diameter_method, two_source=False)
-    print("Diameter single LongTermImprovement done!")
-    get_results("networks/LongTermImprovement.inp", pipe_diameter_method, two_source=True)
-    print("Diameter double LongTermImprovement done!")
+        get_results("networks/Net1.inp", combined_method, two_source=False)
+        print("Combined single Net1 done!")
+        get_results("networks/Net1.inp", combined_method, two_source=True)
+        print("Combined double Net1 done!")
+        get_results("networks/Net3.inp", combined_method, two_source=False)
+        print("Combined single Net3 done!")
+        get_results("networks/Net3.inp", combined_method, two_source=True)
+        print("Combined double Net3 done!")
+        get_results("networks/LongTermImprovement.inp", combined_method, two_source=False)
+        print("Combined single LongTermImprovement done!")
+        get_results("networks/LongTermImprovement.inp", combined_method, two_source=True)
+        print("Combined double LongTermImprovement done!")
 
-    get_results("networks/Net1.inp", combined_method, two_source=False)
-    print("Combined single Net1 done!")
-    get_results("networks/Net1.inp", combined_method, two_source=True)
-    print("Combined double Net1 done!")
-    get_results("networks/Net3.inp", combined_method, two_source=False)
-    print("Combined single Net3 done!")
-    get_results("networks/Net3.inp", combined_method, two_source=True)
-    print("Combined double Net3 done!")
-    get_results("networks/LongTermImprovement.inp", combined_method, two_source=False)
-    print("Combined single LongTermImprovement done!")
-    get_results("networks/LongTermImprovement.inp", combined_method, two_source=True)
-    print("Combined double LongTermImprovement done!")
-
-    #get_results("networks/Net1.inp", brute_force_method, two_source=False)
-    print("net1")
-    #get_results("networks/Net1.inp", brute_force_method, two_source=True)
-    print("net1")
-    #get_results("networks/Net3.inp", brute_force_method, two_source=False)
-    print("net3")
-    #get_results("networks/Net3.inp", brute_force_method, two_source=True)
-    print("net3")
-    get_results("networks/LongTermImprovement.inp", brute_force_method, two_source=False)
-    print('lti')
-    get_results("networks/LongTermImprovement.inp", brute_force_method, two_source=True)
-    print('lti')
+        get_results("networks/Net1.inp", genetic_algorithm_method, n_iter=5, n_nodes_in_pop=5, r_cross=0.9, r_mut=0.03, two_source=False)
+        print("Genetic algorithm single Net1 done!")
+        get_results("networks/Net1.inp", genetic_algorithm_method, n_iter=5, n_nodes_in_pop=5, r_cross=0.9, r_mut=0.03, two_source=True)
+        print("Genetic algorithm double Net1 done!")
+        get_results("networks/Net3.inp", genetic_algorithm_method, n_iter=5, n_nodes_in_pop=5, r_cross=0.9, r_mut=0.03, two_source=False)
+        print("Genetic algorithm single Net3 done!")
+        get_results("networks/Net3.inp", genetic_algorithm_method, n_iter=5, n_nodes_in_pop=5, r_cross=0.9, r_mut=0.03, two_source=True)
+        print("Genetic algorithm double Net3 done!")
+        get_results("networks/LongTermImprovement.inp", genetic_algorithm_method, n_iter=5, n_nodes_in_pop=5, r_cross=0.9, r_mut=0.03, two_source=False)
+        print("Genetic algorithm single LongTermImprovement done!")
+        get_results("networks/LongTermImprovement.inp", genetic_algorithm_method, n_iter=5, n_nodes_in_pop=5, r_cross=0.9, r_mut=0.03, two_source=True)
+        print("Genetic algorithm double LongTermImprovement done!")
